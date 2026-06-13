@@ -1,0 +1,12 @@
+#
+# Dependabot Configuration Files
+#
+# List for "package-ecosystem": https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference#package-ecosystem-
+#
+version: 2
+
+updates:
+  - package-ecosystem: docker
+    directories: [ "**/*" ]
+    schedule:
+      interval: "weekly"
