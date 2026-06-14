@@ -7,9 +7,14 @@ version: 2
 
 updates:
   - package-ecosystem: github-actions
-    directories: [ "**/*" ]
+    directory: "/"
     schedule:
       interval: "daily"
+    groups:
+      # Group all action updates in a single PR (instead of creating one PR per update).
+      all-actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: docker
     directories: [ "**/*" ]
