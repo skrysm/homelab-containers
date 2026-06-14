@@ -52,19 +52,8 @@ jobs:
 
       - name: Detect Unbound version
         id: version
-        run: |
-          version="$(
-            docker run --rm unbound-version-probe:local unbound -V 2>&1 \
-              | sed -nE 's/^Version ([0-9][^[:space:]]*).*/\1/p' \
-              | head -n 1
-          )"
-
-          if [ -z "$version" ]; then
-            echo "Failed to detect Unbound version from image." >&2
-            exit 1
-          fi
-
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+        shell: pwsh
+        run: ./unbound/Get-UnboundVersion.ps1 -Image unbound-version-probe:local -GitHubOutputName version
 
       - name: Publish multi-platform image
         uses: docker/build-push-action@v6
