@@ -1,0 +1,11 @@
+services:
+  unbound:
+    image: ${UNBOUND_TEST_IMAGE:-homelab-unbound:local}
+    ports:
+      - "127.0.0.1:53:53/tcp"
+      - "127.0.0.1:53:53/udp"
+    volumes:
+      - type: bind
+        source: ./unbound.conf
+        target: /etc/unbound/unbound.conf
+        read_only: true

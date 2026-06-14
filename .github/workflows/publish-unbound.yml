@@ -25,7 +25,7 @@ env:
 
 jobs:
   build:
-    name: Build image
+    name: Build and test image
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -49,6 +49,10 @@ jobs:
         id: version
         shell: pwsh
         run: ./unbound/Get-UnboundVersion.ps1 -Image unbound-version-probe:local -GitHubOutputName version
+
+      - name: Test Unbound container
+        shell: pwsh
+        run: ./unbound/test/Test-UnboundContainer.ps1 -Image unbound-version-probe:local
 
   publish:
     name: Publish image
