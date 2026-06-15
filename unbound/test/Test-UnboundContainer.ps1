@@ -20,7 +20,9 @@ param (
 
     [string] $RealWorldName = "example.com",
 
-    [int] $StartupTimeoutSeconds = 30
+    [int] $StartupTimeoutSeconds = 30,
+
+    [switch] $GitHubOutput
 )
 
 
@@ -232,7 +234,12 @@ try {
 }
 catch {
     function LogError([string] $exception) {
-        Write-Host -ForegroundColor Red $exception
+        if ($GitHubOutput) {
+            Write-Host -ForegroundColor Red "::error::$exception"
+        }
+        else {
+            Write-Host -ForegroundColor Red $exception
+        }
     }
 
     # Type of $_: System.Management.Automation.ErrorRecord
