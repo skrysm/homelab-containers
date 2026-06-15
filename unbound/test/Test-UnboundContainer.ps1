@@ -142,7 +142,7 @@ try {
 
     function Assert-NsLookupIsAvailable {
         if (-not (Get-Command nslookup -ErrorAction SilentlyContinue)) {
-            throw "The 'nslookup' command is required to run this test."
+            Write-Error "The 'nslookup' command is required to run this test."
         }
     }
 
@@ -150,7 +150,7 @@ try {
         $expected = [System.Net.IPAddress]::Parse($ExpectedAddress)
 
         if ($expected -notin $Addresses) {
-            throw "Expected '$Name' to resolve to '$ExpectedAddress'. Resolved addresses: $($Addresses -join ', ')"
+            Write-Error "Expected '$Name' to resolve to '$ExpectedAddress'. Resolved addresses: $($Addresses -join ', ')"
         }
     }
 
@@ -159,7 +159,7 @@ try {
         $publicAddresses = $Addresses | Where-Object { -not [System.Net.IPAddress]::IsLoopback($_) }
 
         if (-not $publicAddresses) {
-            throw "Expected '$Name' to resolve to at least one public address. Resolved addresses: $($Addresses -join ', ')"
+            Write-Error "Expected '$Name' to resolve to at least one public address. Resolved addresses: $($Addresses -join ', ')"
         }
     }
 
@@ -183,7 +183,6 @@ try {
         do {
             try {
                 $customAddresses = Invoke-DnsLookup -Name $CUSTOM_NAME
-                Assert-ResolvedAddress -Addresses $customAddresses -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
                 $lastError = $null
                 break
             }
@@ -194,15 +193,16 @@ try {
         } while ([DateTimeOffset]::UtcNow -lt $deadline)
 
         if ($lastError) {
-            throw "Unbound did not become ready within $StartupTimeoutSeconds seconds.`n$lastError"
+            Write-Error "Unbound did not become ready within $StartupTimeoutSeconds seconds.`n$lastError"
         }
 
+        Assert-ResolvedAddress -Addresses $customAddresses -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
         Write-Host "Verified custom DNS record '$CUSTOM_NAME' -> '$CUSTOM_ADDRESS'."
 
         $realWorldAddresses = Invoke-DnsLookup -Name $RealWorldName
         Assert-ResolvesToPublicAddress -Addresses $realWorldAddresses -Name $RealWorldName
-
         Write-Host "Verified real-world DNS lookup for '$RealWorldName' -> '$($realWorldAddresses[0])'."
+
         $failed = $false
     }
     finally {
