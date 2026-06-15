@@ -38,7 +38,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build version probe image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./unbound
           platforms: linux/amd64
@@ -107,7 +107,7 @@ jobs:
 
       - name: Publish multi-platform image
         if: steps.publish.outputs.enabled == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./unbound
           platforms: linux/amd64,linux/arm64,linux/arm/v7
