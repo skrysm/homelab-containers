@@ -52,7 +52,7 @@ jobs:
 
       - name: Test Unbound container
         shell: pwsh
-        run: ./unbound/test/Test-UnboundContainer.ps1 -Image unbound-version-probe:local
+        run: ./unbound/test/Test-UnboundContainer.ps1 -Image unbound-version-probe:local -GitHubOutput
 
   publish:
     name: Publish image
