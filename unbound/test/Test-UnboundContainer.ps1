@@ -26,6 +26,10 @@ param (
 
 $script:ErrorActionPreference = 'Stop'
 
+$PROJECT_NAME = "unbound-test-$([Guid]::NewGuid().ToString('N'))"
+$CUSTOM_NAME = 'healthcheck.homelab.test'
+$CUSTOM_ADDRESS = '192.0.2.123'
+
 function Write-Title([string] $Text) {
     Write-Host -ForegroundColor Cyan $Text
     Write-Host
@@ -37,10 +41,11 @@ function Invoke-DockerCompose {
         [string[]] $Arguments
     )
 
+    $composeFile = Join-Path $PSScriptRoot 'compose.yml'
     $composeArguments = @(
         'compose',
         '--project-name',
-        $projectName,
+        $PROJECT_NAME,
         '--file',
         $composeFile
     ) + $Arguments
@@ -154,10 +159,6 @@ function Assert-ResolvesToPublicAddress([System.Net.IPAddress[]] $Addresses, [st
     }
 }
 
-$customName = 'healthcheck.homelab.test'
-$customAddress = '203.0.113.42'
-$composeFile = Join-Path $PSScriptRoot 'compose.yml'
-$projectName = "unbound-test-$([Guid]::NewGuid().ToString('N'))"
 $failed = $true
 
 try {
@@ -165,7 +166,7 @@ try {
 
     Assert-NsLookupIsAvailable
 
-    Write-Title "Starting Unbound test stack '$projectName' from image '$Image'."
+    Write-Title "Starting Unbound test stack '$PROJECT_NAME' from image '$Image'."
 
     Invoke-DockerCompose up --detach
 
@@ -177,8 +178,8 @@ try {
 
     do {
         try {
-            $customAddresses = Invoke-DnsLookup -Name $customName
-            Assert-ResolvedAddress -Addresses $customAddresses -ExpectedAddress $customAddress -Name $customName
+            $customAddresses = Invoke-DnsLookup -Name $CUSTOM_NAME
+            Assert-ResolvedAddress -Addresses $customAddresses -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
             $lastError = $null
             break
         }
@@ -192,7 +193,7 @@ try {
         throw "Unbound did not become ready within $StartupTimeoutSeconds seconds.`n$lastError"
     }
 
-    Write-Host "Verified custom DNS record '$customName' -> '$customAddress'."
+    Write-Host "Verified custom DNS record '$CUSTOM_NAME' -> '$CUSTOM_ADDRESS'."
 
     $realWorldAddresses = Invoke-DnsLookup -Name $RealWorldName
     Assert-ResolvesToPublicAddress -Addresses $realWorldAddresses -Name $RealWorldName
@@ -214,7 +215,7 @@ finally {
     }
 
     Write-Host
-    Write-Title "Shutting down test stack '$projectName'"
+    Write-Title "Shutting down test stack '$PROJECT_NAME'"
     try {
         Invoke-DockerCompose down --volumes --remove-orphans
     }
