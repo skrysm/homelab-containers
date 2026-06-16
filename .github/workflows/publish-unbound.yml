@@ -21,7 +21,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}/unbound
+  FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/unbound
 
 jobs:
   build:
@@ -43,16 +43,16 @@ jobs:
           context: ./unbound
           platforms: linux/amd64
           load: true
-          tags: unbound-version-probe:local
+          tags: homelab-unbound:local
 
       - name: Detect Unbound version
         id: version
         shell: pwsh
-        run: ./unbound/Get-UnboundVersion.ps1 -Image unbound-version-probe:local -GitHubOutputName version
+        run: ./unbound/Get-UnboundVersion.ps1 -Image homelab-unbound:local -GitHubOutputName version
 
       - name: Test Unbound container
         shell: pwsh
-        run: ./unbound/test/Test-UnboundContainer.ps1 -Image unbound-version-probe:local -GitHubOutput
+        run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:local -GitHubOutput
 
   publish:
     name: Publish image
@@ -78,7 +78,7 @@ jobs:
         id: publish
         shell: pwsh
         run: |
-          $tag = "${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }}"
+          $tag = "${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}"
 
           docker manifest inspect "$tag" *> $null
           $tagExists = $LASTEXITCODE -eq 0
@@ -113,5 +113,5 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }}
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}
+            ${{ env.FINAL_IMAGE_NAME }}:latest
