@@ -18,6 +18,7 @@
 			"matchManagers": ["github-actions"],
 			"groupName": "GitHub Actions",
 			"groupSlug": "github-actions",
+			"automerge": true,
 			"labels": ["dependencies", "github-actions"]
 		},
 		{
@@ -26,6 +27,7 @@
 			"matchUpdateTypes": ["digest", "patch", "minor"],
 			"groupName": "Docker images",
 			"groupSlug": "docker-images",
+			"automerge": true,
 			"labels": ["dependencies", "docker"]
 		},
 		{
@@ -34,6 +36,7 @@
 			"matchUpdateTypes": ["major"],
 			"groupName": "Docker major updates",
 			"groupSlug": "docker-major",
+			"automerge": false,
 			"labels": ["dependencies", "docker", "major"]
 		}
 	]
