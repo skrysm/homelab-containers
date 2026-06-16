@@ -1,6 +1,7 @@
 services:
   unbound:
     image: ${UNBOUND_TEST_IMAGE:-homelab-unbound:local}
+    platform: ${UNBOUND_TEST_PLATFORM:-}
     ports:
       - "127.0.0.1:53:53/tcp"
       - "127.0.0.1:53:53/udp"

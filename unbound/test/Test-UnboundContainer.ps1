@@ -18,6 +18,8 @@ It checks two cases:
 param (
     [string] $Image = "homelab-unbound:local",
 
+    [string] $Platform = '',
+
     [string] $RealWorldName = "example.com",
 
     [int] $StartupTimeoutSeconds = 30,
@@ -170,9 +172,18 @@ try {
     try {
         $env:UNBOUND_TEST_IMAGE = $Image
 
+        if ($Platform) {
+            $env:UNBOUND_TEST_PLATFORM = $Platform
+        }
+
         Assert-NsLookupIsAvailable
 
-        Write-Title "Starting Unbound test stack '$PROJECT_NAME' from image '$Image'."
+        if ($Platform) {
+            Write-Title "Starting Unbound test stack '$PROJECT_NAME' from image '$Image' for platform '$Platform'."
+        }
+        else {
+            Write-Title "Starting Unbound test stack '$PROJECT_NAME' from image '$Image'."
+        }
 
         Invoke-DockerCompose up --detach
 
