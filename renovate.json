@@ -1,40 +1,40 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": [
+		"config:recommended"
+	],
 
-  "dependencyDashboard": true,
+	"dependencyDashboard": true,
 
-  "configMigration": true,
+	"configMigration": true,
 
-  "prHourlyLimit": 0,
-  "prConcurrentLimit": 5,
+	"prHourlyLimit": 0,
+	"prConcurrentLimit": 5,
 
-  "labels": ["dependencies"],
-  "packageRules": [
-    {
-      "description": "Group all GitHub Actions updates",
-      "matchManagers": ["github-actions"],
-      "groupName": "GitHub Actions",
-      "groupSlug": "github-actions",
-      "labels": ["dependencies", "github-actions"]
-    },
-    {
-      "description": "Group Docker image tag and digest updates",
-      "matchDatasources": ["docker"],
-      "matchUpdateTypes": ["digest", "patch", "minor"],
-      "groupName": "Docker images",
-      "groupSlug": "docker-images",
-      "labels": ["dependencies", "docker"]
-    },
-    {
-      "description": "Keep Docker major updates separate",
-      "matchDatasources": ["docker"],
-      "matchUpdateTypes": ["major"],
-      "groupName": "Docker major updates",
-      "groupSlug": "docker-major",
-      "labels": ["dependencies", "docker", "major"]
-    }
-  ]
+	"labels": ["dependencies"],
+	"packageRules": [
+		{
+			"description": "Group all GitHub Actions updates",
+			"matchManagers": ["github-actions"],
+			"groupName": "GitHub Actions",
+			"groupSlug": "github-actions",
+			"labels": ["dependencies", "github-actions"]
+		},
+		{
+			"description": "Group Docker image tag and digest updates",
+			"matchDatasources": ["docker"],
+			"matchUpdateTypes": ["digest", "patch", "minor"],
+			"groupName": "Docker images",
+			"groupSlug": "docker-images",
+			"labels": ["dependencies", "docker"]
+		},
+		{
+			"description": "Keep Docker major updates separate",
+			"matchDatasources": ["docker"],
+			"matchUpdateTypes": ["major"],
+			"groupName": "Docker major updates",
+			"groupSlug": "docker-major",
+			"labels": ["dependencies", "docker", "major"]
+		}
+	]
 }
