@@ -41,6 +41,10 @@ jobs:
 
       - name: Build version probe image
         uses: docker/build-push-action@v7
+        env:
+          # See: https://github.com/docker/build-push-action/tree/v7/#environment-variables
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: ./unbound
           platforms: linux/amd64
