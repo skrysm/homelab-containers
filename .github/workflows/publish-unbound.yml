@@ -26,11 +26,12 @@ env:
   PUSH_IMAGE: ${{ github.event_name != 'pull_request' }}
 
 jobs:
-  build:
-    name: Build and test image
+  prepare:
+    name: Prepare image build
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      should_build_image: ${{ steps.publish.outputs.should_build_image }}
 
     steps:
       - name: Check out repository
@@ -60,36 +61,11 @@ jobs:
         shell: pwsh
         run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:local -GitHubOutput
 
-  # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
-  #   inside this workflow before the PR is merged to the main branch.
-  publish:
-    name: Publish image${{ github.event_name == 'pull_request' && ' (dry run)' || '' }}
-    needs: build
-    runs-on: ubuntu-latest
-    outputs:
-      should_build_image: ${{ steps.publish.outputs.should_build_image }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GitHub Container Registry
-        # NOTE: We skip this step here to make sure that these runs cannot push the container image by accident.
-        if: env.PUSH_IMAGE == 'true'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Decide whether to publish
         id: publish
         shell: pwsh
         run: |
-          $tag = "${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}"
+          $tag = "${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}"
 
           if ("${{ github.event_name }}" -eq "pull_request") {
               "should_build_image=true" >> $env:GITHUB_OUTPUT
@@ -113,34 +89,56 @@ jobs:
           }
           else {
               "should_build_image=true" >> $env:GITHUB_OUTPUT
-              Write-Host "Publishing image for Unbound ${{ needs.build.outputs.version }}."
+              Write-Host "Publishing image for Unbound ${{ steps.version.outputs.version }}."
           }
 
+  # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
+  #   inside this workflow before the PR is merged to the main branch.
+  publish:
+    name: ${{ github.event_name == 'pull_request' && 'Build image only (dry run)' || 'Publish image' }}
+    needs: prepare
+    if: needs.prepare.outputs.should_build_image == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        # NOTE: We skip this step here to make sure that these runs cannot push the container image by accident.
+        if: env.PUSH_IMAGE == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up QEMU
-        if: steps.publish.outputs.should_build_image == 'true'
         uses: docker/setup-qemu-action@v4
         with:
           platforms: arm64,arm
 
       - name: Publish multi-platform image${{ github.event_name == 'pull_request' && ' (dry run)' || '' }}
-        if: steps.publish.outputs.should_build_image == 'true'
         uses: docker/build-push-action@v7
         with:
           context: ./unbound
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: ${{ env.PUSH_IMAGE == 'true' }}
           tags: |
-            ${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}
+            ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
 
   verify-published:
     name: Verify published image (${{ matrix.platform }})
 
     needs:
-      - build
+      - prepare
       - publish
 
-    if: needs.publish.outputs.should_build_image == 'true' && github.event_name != 'pull_request'
+    if: needs.prepare.outputs.should_build_image == 'true' && github.event_name != 'pull_request'
 
     runs-on: ubuntu-latest
 
@@ -168,7 +166,7 @@ jobs:
       - name: Pull published image
         shell: pwsh
         run: |
-          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}'
+          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}'
           $platform = '${{ matrix.platform }}'
 
           for ($attempt = 1; $attempt -le 5; $attempt++) {
@@ -187,4 +185,4 @@ jobs:
 
       - name: Test published image
         shell: pwsh
-        run: ./unbound/test/Test-UnboundContainer.ps1 -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}' -Platform '${{ matrix.platform }}' -GitHubOutput
+        run: ./unbound/test/Test-UnboundContainer.ps1 -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}' -Platform '${{ matrix.platform }}' -GitHubOutput
