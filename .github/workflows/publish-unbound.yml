@@ -18,7 +18,8 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  packages: write # for publishing new container images
+  actions: write  # for cancelling the workflow run
 
 env:
   FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/unbound
@@ -31,7 +32,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      should_build_image: ${{ steps.publish.outputs.should_build_image }}
 
     steps:
       - name: Check out repository
@@ -61,17 +61,13 @@ jobs:
         shell: pwsh
         run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:local -GitHubOutput
 
-      - name: Decide whether to publish
-        id: publish
+      - name: Decide whether publishing is needed (for scheduled runs)
+        if: github.event_name == 'schedule'
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}"
-
-          if ("${{ github.event_name }}" -eq "pull_request") {
-              "should_build_image=true" >> $env:GITHUB_OUTPUT
-              Write-Host "Pull request run. Building publish image without pushing."
-              exit 0
-          }
 
           docker manifest inspect "$tag" *> $null
           $tagExists = $LASTEXITCODE -eq 0
@@ -83,21 +79,21 @@ jobs:
               Write-Host "Image tag does not exist yet: $tag"
           }
 
-          if ("${{ github.event_name }}" -eq "schedule" -and $tagExists) {
-              "should_build_image=false" >> $env:GITHUB_OUTPUT
-              Write-Host "Scheduled run found no new Unbound version. Skipping publish."
+          if ($tagExists) {
+              Write-Host "Scheduled run found no new Unbound version. Cancelling run."
+              gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}"
+              Start-Sleep -Seconds 30
+              Write-Error "Cancellation request did not stop this run in time."
+              exit 1
           }
-          else {
-              "should_build_image=true" >> $env:GITHUB_OUTPUT
-              Write-Host "Publishing image for Unbound ${{ steps.version.outputs.version }}."
-          }
+
+          Write-Host "Publishing image for Unbound ${{ steps.version.outputs.version }}."
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
   publish:
     name: ${{ github.event_name == 'pull_request' && 'Build image only (dry run)' || 'Publish image' }}
     needs: prepare
-    if: needs.prepare.outputs.should_build_image == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -138,7 +134,7 @@ jobs:
       - prepare
       - publish
 
-    if: needs.prepare.outputs.should_build_image == 'true' && github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request'
 
     runs-on: ubuntu-latest
 
