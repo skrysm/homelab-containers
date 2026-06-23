@@ -126,6 +126,16 @@ jobs:
           tags: |
             ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
+          # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
+          # published image:
+          #
+          # * "provenance" records how the image was built
+          # * "SBOM" records the packages/artifacts found in the image
+          #
+          # NOTE: GitHub's container registry UI shows these attestation manifests as an extra
+          # "unknown/unknown" architecture entry; that is fine and can be ignored.
+          provenance: true
+          sbom: true
 
   verify-published:
     name: Verify published image (${{ matrix.platform }})
