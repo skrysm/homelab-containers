@@ -127,6 +127,10 @@ jobs:
           tags: |
             ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
+          # NOTE: Labels can be inspected via:
+          #
+          #   docker image inspect ghcr.io/skrysm/homelab-containers/unbound:latest --format '{{ json .Config.Labels }}' | jq
+          #
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
