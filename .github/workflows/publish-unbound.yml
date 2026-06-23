@@ -126,6 +126,16 @@ jobs:
           tags: |
             ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.title=Unbound
+            org.opencontainers.image.description=Unbound DNS resolver packaged for homelab containers
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}/pkgs/container/unbound
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.documentation=${{ github.server_url }}/${{ github.repository }}/tree/${{ github.sha }}/unbound
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.build_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
           # published image:
           #
