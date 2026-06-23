@@ -97,6 +97,28 @@ try {
         return @($addresses)
     }
 
+    function Get-UnboundContainerId {
+        $containerId = Invoke-DockerCompose ps --quiet unbound
+
+        if (-not $containerId) {
+            Write-Error "Could not determine Unbound container ID."
+        }
+
+        return $containerId
+    }
+
+    function Get-ContainerHealthStatus([string] $ContainerId) {
+        $healthStatus = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $ContainerId
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -ne 0) {
+            $text = ($healthStatus | Out-String).Trim()
+            throw "docker inspect failed for container '$ContainerId' with exit code $exitCode.`n$text"
+        }
+
+        return ($healthStatus | Select-Object -First 1).Trim()
+    }
+
     function Get-ResolvedAddressesFromNsLookupOutput([string[]] $OutputLines) {
         #
         # Output on Windows:
@@ -142,6 +164,29 @@ try {
         }
 
         $addresses | Select-Object -Unique
+    }
+
+    function Assert-ContainerBecomesHealthy([int] $TimeoutSeconds) {
+        $containerId = Get-UnboundContainerId
+        $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
+        $lastHealthStatus = $null
+
+        do {
+            $lastHealthStatus = Get-ContainerHealthStatus -ContainerId $containerId
+
+            if ($lastHealthStatus -eq 'healthy') {
+                Write-Host "Verified container health status: healthy."
+                return
+            }
+
+            if ($lastHealthStatus -eq 'unhealthy') {
+                Write-Error "Unbound container became unhealthy."
+            }
+
+            Start-Sleep -Seconds 1
+        } while ([DateTimeOffset]::UtcNow -lt $deadline)
+
+        Write-Error "Unbound container did not become healthy within $TimeoutSeconds seconds. Last health status: $lastHealthStatus"
     }
 
     function Assert-NsLookupIsAvailable {
@@ -190,25 +235,9 @@ try {
         Write-Host
         Write-Title "Running verification tests"
 
-        $deadline = [DateTimeOffset]::UtcNow.AddSeconds($StartupTimeoutSeconds)
-        $lastError = $null
+        Assert-ContainerBecomesHealthy -TimeoutSeconds $StartupTimeoutSeconds
 
-        do {
-            try {
-                $customAddresses = Invoke-DnsLookup -Name $CUSTOM_NAME
-                $lastError = $null
-                break
-            }
-            catch {
-                $lastError = $_
-                Start-Sleep -Seconds 1
-            }
-        } while ([DateTimeOffset]::UtcNow -lt $deadline)
-
-        if ($lastError) {
-            Write-Error "Unbound did not become ready within $StartupTimeoutSeconds seconds.`n$lastError"
-        }
-
+        $customAddresses = Invoke-DnsLookup -Name $CUSTOM_NAME
         Assert-ResolvedAddress -Addresses $customAddresses -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
         Write-Host "Verified custom DNS record '$CUSTOM_NAME' -> '$CUSTOM_ADDRESS'."
 
