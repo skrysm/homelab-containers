@@ -40,7 +40,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build version probe image
+      - name: Build candidate image
         uses: docker/build-push-action@v7
         env:
           # See: https://github.com/docker/build-push-action/tree/v7/#environment-variables
@@ -50,16 +50,16 @@ jobs:
           context: ./unbound
           platforms: linux/amd64
           load: true
-          tags: homelab-unbound:local
+          tags: homelab-unbound:candidate
 
       - name: Detect Unbound version
         id: version
         shell: pwsh
-        run: ./unbound/Get-UnboundVersion.ps1 -Image homelab-unbound:local -GitHubOutputName version
+        run: ./unbound/Get-UnboundVersion.ps1 -Image homelab-unbound:candidate -GitHubOutputName version
 
       - name: Test Unbound container
         shell: pwsh
-        run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:local -GitHubOutput
+        run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:candidate -GitHubOutput
 
       - name: Decide whether publishing is needed (for scheduled runs)
         if: github.event_name == 'schedule'
