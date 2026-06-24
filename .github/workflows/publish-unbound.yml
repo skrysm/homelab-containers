@@ -68,27 +68,41 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
+          $candidateImage = "homelab-unbound:candidate"
 
-          docker manifest inspect "$tag" *> $null
-          $tagExists = $LASTEXITCODE -eq 0
+          docker manifest inspect "$publishedImage" *> $null
+          $publishedImageExists = $LASTEXITCODE -eq 0
 
-          if ($tagExists) {
-              Write-Host "Image tag already exists: $tag"
+          if (-Not $publishedImageExists) {
+              Write-Host "Publishing image because no previous published image was found."
+              exit 0
           }
-          else {
-              Write-Host "Image tag does not exist yet: $tag"
+
+          $candidateManifestLines = docker run --rm "$candidateImage" cat /image-package-manifest.txt
+          if ($LASTEXITCODE -ne 0) {
+              Write-Error "Failed to read package manifest from candidate image '$candidateImage'."
+              exit 1
           }
 
-          if ($tagExists) {
-              Write-Host "Scheduled run found no new Unbound version. Cancelling run."
+          $publishedManifestLines = docker run --rm "$publishedImage" cat /image-package-manifest.txt
+          if ($LASTEXITCODE -ne 0) {
+              Write-Host "Published image does not contain a readable package manifest. Publishing image."
+              exit 0
+          }
+
+          $candidateManifestText = ($candidateManifestLines | Out-String).Trim()
+          $publishedManifestText = ($publishedManifestLines | Out-String).Trim()
+
+          if ($candidateManifestText -eq $publishedManifestText) {
+              Write-Host "Scheduled run found no package version changes. Cancelling run."
               gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}"
               Start-Sleep -Seconds 30
               Write-Error "Cancellation request did not stop this run in time."
               exit 1
           }
 
-          Write-Host "Publishing image for Unbound ${{ steps.version.outputs.version }}."
+          Write-Host "New package version found. Publishing image for Unbound ${{ steps.version.outputs.version }}."
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
