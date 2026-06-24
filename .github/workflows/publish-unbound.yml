@@ -75,7 +75,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           function Write-PublishDecision([bool] $ShouldPublish, [string] $Reason) {
-              $decision = if ($ShouldPublish) { "Publish image" } else { "Do not publish image" }
+              $decision = if ($ShouldPublish) { "✅ Publish image" } else { "⏭️ Do not publish image" }
 
               Write-Host "$($decision): $Reason"
 
