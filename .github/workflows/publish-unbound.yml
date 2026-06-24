@@ -74,6 +74,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          function Write-PublishDecision([bool] $ShouldPublish, [string] $Reason) {
+              $decision = if ($ShouldPublish) { "Publish image" } else { "Do not publish image" }
+
+              Write-Host "$($decision): $Reason"
+
+              @(
+                  "## Publish decision"
+                  ""
+                  "**Decision:** $decision"
+                  ""
+                  "**Reason:** $Reason"
+              ) >> $env:GITHUB_STEP_SUMMARY
+          }
+
           $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
           $candidateImage = "homelab-unbound:candidate"
 
@@ -81,7 +95,9 @@ jobs:
           $publishedImageExists = $LASTEXITCODE -eq 0
 
           if (-Not $publishedImageExists) {
-              Write-Host "Publishing image because no previous published image was found."
+              Write-PublishDecision `
+                  -ShouldPublish $true `
+                  -Reason "No previous published image was found at '$publishedImage'."
               exit 0
           }
 
@@ -93,7 +109,9 @@ jobs:
 
           $publishedManifestLines = docker run --rm "$publishedImage" cat /image-package-manifest.txt
           if ($LASTEXITCODE -ne 0) {
-              Write-Host "Published image does not contain a readable package manifest. Publishing image."
+              Write-PublishDecision `
+                  -ShouldPublish $true `
+                  -Reason "The published image '$publishedImage' does not contain a readable package manifest."
               exit 0
           }
 
@@ -101,14 +119,18 @@ jobs:
           $publishedManifestText = ($publishedManifestLines | Out-String).Trim()
 
           if ($candidateManifestText -eq $publishedManifestText) {
-              Write-Host "Scheduled run found no package version changes. Cancelling run."
+              Write-PublishDecision `
+                  -ShouldPublish $false `
+                  -Reason "The candidate and published package manifests are identical."
               gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}"
               Start-Sleep -Seconds 30
               Write-Error "Cancellation request did not stop this run in time."
               exit 1
           }
 
-          Write-Host "New package version found. Publishing image for Unbound ${{ steps.version.outputs.version }}."
+          Write-PublishDecision `
+              -ShouldPublish $true `
+              -Reason "At least one package version changed between the candidate image and '$publishedImage'."
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
