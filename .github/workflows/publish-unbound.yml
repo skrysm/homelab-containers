@@ -16,6 +16,12 @@ on:
     # Every day at 04:23 UTC.
     - cron: "23 4 * * *"
   workflow_dispatch:
+    inputs:
+      treat_as_scheduled_run:
+        description: "Treat as 'scheduled' run (for testing purposes)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -63,7 +69,7 @@ jobs:
         run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:candidate -GitHubOutput
 
       - name: Decide whether publishing is needed (for scheduled runs)
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
