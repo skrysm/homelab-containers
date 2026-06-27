@@ -68,6 +68,61 @@ jobs:
         shell: pwsh
         run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:candidate -GitHubOutput
 
+      # Detects whether any packages in the candidate image have changed compared to the latest
+      # published image and print the comparison to the GitHub Actions workflow summary.
+      - name: Create package manifest comparison
+        id: package_manifest_comparison
+        shell: pwsh
+        run: |
+          $candidateImage = "homelab-unbound:candidate"
+          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
+
+          docker manifest inspect "$publishedImage" *> $null
+          $publishedImageExists = $LASTEXITCODE -eq 0
+
+          $summaryLines = @(
+              "## Package manifest comparison"
+              ""
+              "**Comparison image:** ``$publishedImage``"
+              ""
+          )
+
+          if (-not $publishedImageExists) {
+              $packageManifestChanged = $true
+              $comparisonReason = "No previous published image was found at '$publishedImage'."
+              $packageComparisonMarkdownLines = @()
+          }
+          else {
+              $packageComparison = ./scripts/Compare-AlpineImagePackages.ps1 `
+                  -PublishedImage $publishedImage `
+                  -CandidateImage $candidateImage `
+                  -PassThru
+
+              $packageManifestChanged = $packageComparison.PackageManifestChanged
+              $packageComparisonMarkdownLines = @($packageComparison.MarkdownLines)
+
+              if (-not $packageManifestChanged) {
+                  $comparisonReason = "No package version changes between the candidate image and '$publishedImage'."
+                  $packageComparisonMarkdownLines = @()
+              }
+              else {
+                  $comparisonReason = "At least one package version changed between the candidate image and '$publishedImage'."
+              }
+          }
+
+          Write-Host "Package manifest comparison result: $comparisonReason"
+
+          "package_manifest_changed=$($packageManifestChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+          if ($packageComparisonMarkdownLines.Count -gt 0) {
+              $summaryLines += $packageComparisonMarkdownLines
+          }
+          elseif ($comparisonReason) {
+              $summaryLines += $comparisonReason
+          }
+
+          $summaryLines >> $env:GITHUB_STEP_SUMMARY
+
       - name: Decide whether publishing is needed (for scheduled runs)
         if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
         shell: pwsh
@@ -89,48 +144,34 @@ jobs:
           }
 
           $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
-          $candidateImage = "homelab-unbound:candidate"
 
-          docker manifest inspect "$publishedImage" *> $null
-          $publishedImageExists = $LASTEXITCODE -eq 0
+          $shouldPublish = '${{ steps.package_manifest_comparison.outputs.package_manifest_changed }}' -eq 'true'
 
-          if (-Not $publishedImageExists) {
-              Write-PublishDecision `
-                  -ShouldPublish $true `
-                  -Reason "No previous published image was found at '$publishedImage'."
-              exit 0
+          if ($shouldPublish) {
+              docker manifest inspect "$publishedImage" *> $null
+              $publishedImageExists = $LASTEXITCODE -eq 0
+
+              if ($publishedImageExists) {
+                  $reason = "The package manifest changed compared to '$publishedImage'."
+              }
+              else {
+                  $reason = "No previous published image was found at '$publishedImage'."
+              }
+          }
+          else {
+              $reason = "The package manifest is unchanged compared to '$publishedImage'."
           }
 
-          $candidateManifestLines = docker run --rm "$candidateImage" cat /image-package-manifest.txt
-          if ($LASTEXITCODE -ne 0) {
-              Write-Error "Failed to read package manifest from candidate image '$candidateImage'."
-              exit 1
-          }
+          Write-PublishDecision `
+              -ShouldPublish $shouldPublish `
+              -Reason $reason
 
-          $publishedManifestLines = docker run --rm "$publishedImage" cat /image-package-manifest.txt
-          if ($LASTEXITCODE -ne 0) {
-              Write-PublishDecision `
-                  -ShouldPublish $true `
-                  -Reason "The published image '$publishedImage' does not contain a readable package manifest."
-              exit 0
-          }
-
-          $candidateManifestText = ($candidateManifestLines | Out-String).Trim()
-          $publishedManifestText = ($publishedManifestLines | Out-String).Trim()
-
-          if ($candidateManifestText -eq $publishedManifestText) {
-              Write-PublishDecision `
-                  -ShouldPublish $false `
-                  -Reason "The candidate and published package manifests are identical."
+          if (-not $shouldPublish) {
               gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}"
               Start-Sleep -Seconds 30
               Write-Error "Cancellation request did not stop this run in time."
               exit 1
           }
-
-          Write-PublishDecision `
-              -ShouldPublish $true `
-              -Reason "At least one package version changed between the candidate image and '$publishedImage'."
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
