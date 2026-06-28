@@ -12,7 +12,7 @@ $script:ErrorActionPreference = 'Stop'
 try {
     ########################################################################
 
-    $versionOutput = docker run --rm $Image unbound -V
+    $versionOutput = docker run --rm $Image -V
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Failed to run 'unbound -V' in image '$Image'. Docker exited with code $LASTEXITCODE.`n$versionOutput"
     }
