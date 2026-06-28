@@ -34,4 +34,10 @@ USER unbound:unbound
 #   which we use to run helper commands inside the container, such as collecting
 #   the Alpine package manifest. With an ENTRYPOINT, those arguments would be
 #   appended to `unbound` instead.
-CMD ["unbound", "-d"]
+#
+# Command parameters:
+#
+# -d    do not fork into the background.
+# -v    verbose (without this, Unbound won't even write a startup notification.)
+#       Note that DNS queries are not(!) logged through this.
+CMD ["unbound", "-d", "-v"]
