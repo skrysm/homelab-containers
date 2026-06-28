@@ -13,5 +13,4 @@ EXPOSE 53/tcp 53/udp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD nslookup -type=SOA . 127.0.0.1 > /dev/null || exit 1
 
-ENTRYPOINT ["unbound"]
-CMD ["-d"]
+CMD ["unbound", "-d"]
