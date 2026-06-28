@@ -38,7 +38,7 @@ try {
 
     $PROJECT_NAME = "unbound-test-$([Guid]::NewGuid().ToString('N'))"
     $CUSTOM_NAME = 'healthcheck.homelab.test'
-    $CUSTOM_ADDRESS = '192.0.2.123'
+    $CUSTOM_ADDRESS = '1.2.3.4'
 
     function Write-Title([string] $Text) {
         Write-Host -ForegroundColor Cyan $Text

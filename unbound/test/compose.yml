@@ -7,6 +7,6 @@ services:
       - "127.0.0.1:53:53/udp"
     volumes:
       - type: bind
-        source: ./unbound.conf
-        target: /etc/unbound/unbound.conf
+        source: ./unbound.test.conf
+        target: /etc/unbound/unbound.conf.d/test.conf
         read_only: true
