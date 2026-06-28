@@ -13,8 +13,8 @@ on:
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
   schedule:
-    # Every day at 04:23 UTC.
-    - cron: "23 4 * * *"
+    # Every day at 02:23 UTC.
+    - cron: "23 2 * * *"
   workflow_dispatch:
     inputs:
       treat_as_scheduled_run:
