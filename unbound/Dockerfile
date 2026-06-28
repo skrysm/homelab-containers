@@ -13,6 +13,19 @@ EXPOSE 53/tcp 53/udp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD nslookup -type=SOA . 127.0.0.1 > /dev/null || exit 1
 
+#
+# Hardening
+#
+
+# We must chown /run or else Unbound will fail to start.
+RUN chown unbound:unbound /run
+# Note that Unbound already does privilege dropping. But this makes it never run
+# as root (and also makes any interactive shell inside the container run as non-root).
+USER unbound:unbound
+
+#
+# Command line
+#
 # NOTE: Keep the full command in CMD instead of splitting it between ENTRYPOINT
 #   and CMD. This lets `docker run IMAGE sh ...` replace the default command,
 #   which we use to run helper commands inside the container, such as collecting
