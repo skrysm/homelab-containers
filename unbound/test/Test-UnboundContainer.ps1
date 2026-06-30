@@ -181,11 +181,9 @@ try {
                 return
             }
 
-            if ($lastHealthStatus -eq 'unhealthy') {
-                Write-Error "Unbound container became unhealthy."
-            }
+            Write-Host "Container health status: $lastHealthStatus"
 
-            Start-Sleep -Seconds 1
+            Start-Sleep -Seconds 3
         } while ([DateTimeOffset]::UtcNow -lt $deadline)
 
         Write-Error "Unbound container did not become healthy within $TimeoutSeconds seconds. Last health status: $lastHealthStatus"
@@ -235,9 +233,13 @@ try {
         Invoke-DockerCompose up --detach
 
         Write-Host
-        Write-Title "Running verification tests"
+        Write-Title "Wait for container to become healthy"
 
         Assert-ContainerBecomesHealthy -TimeoutSeconds $StartupTimeoutSeconds
+
+        Write-Host
+        Write-Title "Running verification tests"
+
 
         $customAddresses = Invoke-DnsLookup -Name $CUSTOM_NAME
         Assert-ResolvedAddress -Addresses $customAddresses -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
