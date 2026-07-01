@@ -1,5 +1,9 @@
 #!/usr/bin/env pwsh
 
+#
+# Detects the version tag for the Unbound image.
+#
+
 param (
     [string] $Image = "homelab-unbound:local",
 
@@ -28,7 +32,7 @@ try {
         if ($versionOutputLine -match "^Version\s+([0-9][^\s]*)") {
             $version = $Matches[1]
             Write-Host
-            Write-Host -ForegroundColor DarkGray "Detect version: $version"
+            Write-Host -ForegroundColor DarkGray "Detected version: $version"
             Write-Host
             break
         }
