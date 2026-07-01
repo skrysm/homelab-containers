@@ -8,7 +8,7 @@ FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec4
 RUN apk add --no-cache unbound
 
 # Copy config overwrites to the image.
-COPY unbound.conf.d/ /etc/unbound/unbound.conf.d/
+COPY files/unbound.conf.d/ /etc/unbound/unbound.conf.d/
 
 EXPOSE 53/tcp 53/udp
 
