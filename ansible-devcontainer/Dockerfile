@@ -76,3 +76,6 @@ RUN mkdir -p /home/vscode/.ssh
 #   often don't work because VSCode intercepts them and uses them for itself. Nano uses
 #   different (i.e. more unconventional) shortcuts that do not interfere with VSCode.
 ENV EDITOR=nano
+
+# Just for convenience when running this container directly via "docker run -ti".
+CMD ["/bin/zsh"]
