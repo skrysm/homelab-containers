@@ -3,7 +3,8 @@
 	"cSpell.words": [
 		"editorconfig",
 		"homelab",
-		"markdownlint"
+		"markdownlint",
+		"Passwordless"
 	],
 
 	"markdownlint.config": {
