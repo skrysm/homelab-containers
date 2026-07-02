@@ -45,6 +45,11 @@ try {
         Write-Host
     }
 
+    function Write-DiagnosticsHeader {
+        docker version --format 'Docker client: {{.Client.Version}} {{.Client.Os}}/{{.Client.Arch}}{{println}}Docker server: {{.Server.Version}} {{.Server.Os}}/{{.Server.Arch}}'
+        Write-Host
+    }
+
     function Invoke-DockerCompose {
         param (
             [Parameter(ValueFromRemainingArguments = $true)]
@@ -121,6 +126,26 @@ try {
         return ($healthStatus | Select-Object -First 1).Trim()
     }
 
+    function Write-UnboundHealthDiagnostics([string] $ContainerId) {
+        Write-Host
+        Write-Title "Unbound health diagnostics"
+
+        Write-Host "Container state:"
+        docker inspect --format '{{json .State}}' $ContainerId
+
+        Write-Host
+        Write-Host "Effective container healthcheck config:"
+        docker inspect --format '{{json .Config.Healthcheck}}' $ContainerId
+
+        Write-Host
+        Write-Host "Recorded Docker healthcheck attempts:"
+        docker inspect --format '{{json .State.Health}}' $ContainerId
+
+        Write-Host
+        Write-Host "Manual healthcheck command inside the container:"
+        docker exec $ContainerId nslookup -type=SOA . 127.0.0.1
+    }
+
     function Get-ResolvedAddressesFromNsLookupOutput([string[]] $OutputLines) {
         #
         # Output on Windows:
@@ -170,22 +195,24 @@ try {
 
     function Assert-ContainerBecomesHealthy([int] $TimeoutSeconds) {
         $containerId = Get-UnboundContainerId
+        $startedAt = [DateTimeOffset]::UtcNow
         $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
         $lastHealthStatus = $null
 
         do {
             $lastHealthStatus = Get-ContainerHealthStatus -ContainerId $containerId
 
+            $elapsedSeconds = [int] ([DateTimeOffset]::UtcNow - $startedAt).TotalSeconds
+            Write-Host "[$($elapsedSeconds)s] Container health status: $lastHealthStatus"
+
             if ($lastHealthStatus -eq 'healthy') {
-                Write-Host "Verified container health status: healthy."
                 return
             }
-
-            Write-Host "Container health status: $lastHealthStatus"
 
             Start-Sleep -Seconds 3
         } while ([DateTimeOffset]::UtcNow -lt $deadline)
 
+        Write-UnboundHealthDiagnostics -ContainerId $containerId
         Write-Error "Unbound container did not become healthy within $TimeoutSeconds seconds. Last health status: $lastHealthStatus"
     }
 
@@ -220,6 +247,8 @@ try {
         if ($Platform) {
             $env:UNBOUND_TEST_PLATFORM = $Platform
         }
+
+        Write-DiagnosticsHeader
 
         Assert-NsLookupIsAvailable
 
