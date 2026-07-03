@@ -1,5 +1,5 @@
 name: Publish Unbound image
-run-name: Publish Unbound image | ${{ github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual' || github.event_name == 'pull_request' && 'Pull request' || github.event_name == 'push' && 'Push' || github.event_name }}
+run-name: "Publish Unbound image | ${{ github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual' || github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'push' && 'Push' || github.event_name }}"
 
 on:
   push:
