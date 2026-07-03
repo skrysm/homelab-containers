@@ -8,10 +8,11 @@ Runs a minimal end-to-end test against the Unbound container image.
 The test starts the container with Docker Compose and verifies DNS lookups
 through the running Unbound service.
 
-It checks two cases:
+It checks three cases:
 
-1. A real-world DNS name resolves through Unbound.
-2. A custom local A record from the mounted test config resolves correctly.
+1. A custom local A record from the mounted test config resolves over UDP.
+2. The same custom local A record resolves over TCP.
+3. A real-world DNS name resolves through Unbound.
 
 .EXAMPLE
 ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:local
@@ -73,7 +74,7 @@ try {
         }
     }
 
-    function Invoke-DnsLookup([string] $Name) {
+    function Invoke-DnsLookup([string] $Name, [bool] $UseTcp = $false) {
         $previousErrorActionPreference = $ErrorActionPreference
         try {
             # NOTE: We must use SilentlyContinue here or PowerShell will insert
@@ -81,7 +82,16 @@ try {
             #   is apparently written to stderr instead of stdout).
             $ErrorActionPreference = 'SilentlyContinue'
 
-            $outputLines = & nslookup $Name '127.0.0.1' 2>&1
+            if ($UseTcp) {
+                $protocolName = 'TCP'
+                $nslookupArguments = @('-vc', $Name, '127.0.0.1')
+            }
+            else {
+                $protocolName = 'UDP'
+                $nslookupArguments = @($Name, '127.0.0.1')
+            }
+
+            $outputLines = & nslookup @nslookupArguments 2>&1
 
             $exitCode = $LASTEXITCODE
         }
@@ -91,14 +101,14 @@ try {
 
         if ($exitCode -ne 0) {
             $text = ($outputLines | Out-String).Trim()
-            throw "nslookup $Name 127.0.0.1 failed with exit code $exitCode.`n$text"
+            throw "nslookup over $protocolName for $Name via 127.0.0.1 failed with exit code $exitCode.`n$text"
         }
 
         $addresses = Get-ResolvedAddressesFromNsLookupOutput $outputLines
 
         if (-not $addresses) {
             $text = ($outputLines | Out-String).Trim()
-            throw "nslookup $Name 127.0.0.1 did not return any IP addresses.`n$text"
+            throw "nslookup over $protocolName for $Name via 127.0.0.1 did not return any IP addresses.`n$text"
         }
 
         return @($addresses)
@@ -269,10 +279,13 @@ try {
         Write-Host
         Write-Title "Running verification tests"
 
+        $customAddressesUdp = Invoke-DnsLookup -Name $CUSTOM_NAME
+        Assert-ResolvedAddress -Addresses $customAddressesUdp -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
+        Write-Host "Verified UDP DNS lookup for custom record '$CUSTOM_NAME' -> '$CUSTOM_ADDRESS'."
 
-        $customAddresses = Invoke-DnsLookup -Name $CUSTOM_NAME
-        Assert-ResolvedAddress -Addresses $customAddresses -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
-        Write-Host "Verified custom DNS record '$CUSTOM_NAME' -> '$CUSTOM_ADDRESS'."
+        $customAddressesTcp = Invoke-DnsLookup -Name $CUSTOM_NAME -UseTcp $true
+        Assert-ResolvedAddress -Addresses $customAddressesTcp -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
+        Write-Host "Verified TCP DNS lookup for custom record '$CUSTOM_NAME' -> '$CUSTOM_ADDRESS'."
 
         $realWorldAddresses = Invoke-DnsLookup -Name $RealWorldName
         Assert-ResolvesToPublicAddress -Addresses $realWorldAddresses -Name $RealWorldName
