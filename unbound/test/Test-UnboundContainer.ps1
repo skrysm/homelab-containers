@@ -114,48 +114,6 @@ try {
         return @($addresses)
     }
 
-    function Get-UnboundContainerId {
-        $containerId = Invoke-DockerCompose ps --quiet unbound
-
-        if (-not $containerId) {
-            Write-Error "Could not determine Unbound container ID."
-        }
-
-        return $containerId
-    }
-
-    function Get-ContainerHealthStatus([string] $ContainerId) {
-        $healthStatus = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $ContainerId
-        $exitCode = $LASTEXITCODE
-
-        if ($exitCode -ne 0) {
-            $text = ($healthStatus | Out-String).Trim()
-            throw "docker inspect failed for container '$ContainerId' with exit code $exitCode.`n$text"
-        }
-
-        return ($healthStatus | Select-Object -First 1).Trim()
-    }
-
-    function Write-UnboundHealthDiagnostics([string] $ContainerId) {
-        Write-Host
-        Write-Title "Unbound health diagnostics"
-
-        Write-Host "Container state:"
-        docker inspect --format '{{json .State}}' $ContainerId
-
-        Write-Host
-        Write-Host "Effective container healthcheck config:"
-        docker inspect --format '{{json .Config.Healthcheck}}' $ContainerId
-
-        Write-Host
-        Write-Host "Recorded Docker healthcheck attempts:"
-        docker inspect --format '{{json .State.Health}}' $ContainerId
-
-        Write-Host
-        Write-Host "Manual healthcheck command inside the container:"
-        docker exec $ContainerId nslookup -type=SOA . 127.0.0.1
-    }
-
     function Get-ResolvedAddressesFromNsLookupOutput([string[]] $OutputLines) {
         #
         # Output on Windows:
@@ -201,6 +159,48 @@ try {
         }
 
         $addresses | Select-Object -Unique
+    }
+
+    function Get-UnboundContainerId {
+        $containerId = Invoke-DockerCompose ps --quiet unbound
+
+        if (-not $containerId) {
+            Write-Error "Could not determine Unbound container ID."
+        }
+
+        return $containerId
+    }
+
+    function Get-ContainerHealthStatus([string] $ContainerId) {
+        $healthStatus = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $ContainerId
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -ne 0) {
+            $text = ($healthStatus | Out-String).Trim()
+            throw "docker inspect failed for container '$ContainerId' with exit code $exitCode.`n$text"
+        }
+
+        return ($healthStatus | Select-Object -First 1).Trim()
+    }
+
+    function Write-UnboundHealthDiagnostics([string] $ContainerId) {
+        Write-Host
+        Write-Title "Unbound health diagnostics"
+
+        Write-Host "Container state:"
+        docker inspect --format '{{json .State}}' $ContainerId
+
+        Write-Host
+        Write-Host "Effective container healthcheck config:"
+        docker inspect --format '{{json .Config.Healthcheck}}' $ContainerId
+
+        Write-Host
+        Write-Host "Recorded Docker healthcheck attempts:"
+        docker inspect --format '{{json .State.Health}}' $ContainerId
+
+        Write-Host
+        Write-Host "Manual healthcheck command inside the container:"
+        docker exec $ContainerId nslookup -type=SOA . 127.0.0.1
     }
 
     function Assert-ContainerBecomesHealthy([int] $TimeoutSeconds) {
