@@ -172,15 +172,17 @@ try {
     }
 
     function Get-ContainerHealthStatus([string] $ContainerId) {
-        $healthStatus = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $ContainerId
+        $dockerInspectOutput = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $ContainerId
         $exitCode = $LASTEXITCODE
 
         if ($exitCode -ne 0) {
-            $text = ($healthStatus | Out-String).Trim()
+            $text = ($dockerInspectOutput | Out-String).Trim()
             throw "docker inspect failed for container '$ContainerId' with exit code $exitCode.`n$text"
         }
 
-        return ($healthStatus | Select-Object -First 1).Trim()
+        $containerHealthStatus = ($dockerInspectOutput | Select-Object -First 1).Trim()
+
+        return $containerHealthStatus
     }
 
     function Write-UnboundHealthDiagnostics([string] $ContainerId) {
