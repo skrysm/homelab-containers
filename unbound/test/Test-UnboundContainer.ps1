@@ -172,7 +172,8 @@ try {
     }
 
     function Get-ContainerHealthStatus([string] $ContainerId) {
-        $dockerInspectOutput = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $ContainerId
+        # Obtain both the container's running and health status - separated by a space.
+        $dockerInspectOutput = docker inspect --format '{{if .State.Running}}running{{else}}stopped{{end}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $ContainerId
         $exitCode = $LASTEXITCODE
 
         if ($exitCode -ne 0) {
@@ -180,7 +181,15 @@ try {
             throw "docker inspect failed for container '$ContainerId' with exit code $exitCode.`n$text"
         }
 
-        $containerHealthStatus = ($dockerInspectOutput | Select-Object -First 1).Trim()
+        $statusParts = (($dockerInspectOutput | Select-Object -First 1).Trim() -split '\s+', 2)
+        $containerRunningStatus = $statusParts[0]
+        $containerHealthStatus = $statusParts[1]
+
+        # If the container crashes directly on start, the container will be reported as "unhealthy"
+        # even though it's actually not running. To clarify this, we return 'stopped' in this case.
+        if ($containerRunningStatus -eq 'stopped' -and $containerHealthStatus -eq 'unhealthy') {
+            return 'stopped'
+        }
 
         return $containerHealthStatus
     }
