@@ -10,3 +10,9 @@ services:
         source: ./unbound.test.conf
         target: /etc/unbound/unbound.conf.d/test.conf
         read_only: true
+    # At the time of writing, there is a segfault race condition in Unbound (1.25.1):
+    # https://github.com/NLnetLabs/unbound/issues/1457
+    # Due to this the container crashes sometimes and breaks the build. So we add this
+    # to fix this behavior (since this setting is most likely also going to be present
+    # in "production" configurations).
+    restart: unless-stopped
