@@ -62,7 +62,16 @@ jobs:
       - name: Detect Unbound version
         id: version
         shell: pwsh
-        run: ./unbound/Get-UnboundVersion.ps1 -Image homelab-unbound:candidate -GitHubOutputName version
+        run: |
+          $version = ./unbound/Get-UnboundVersion.ps1 -Image homelab-unbound:candidate
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+          @(
+              "## Unbound version"
+              ""
+              "**Detected version:** ``$version``"
+          ) >> $env:GITHUB_STEP_SUMMARY
 
       - name: Test Unbound container
         shell: pwsh

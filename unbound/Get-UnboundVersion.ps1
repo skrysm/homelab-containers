@@ -5,9 +5,7 @@
 #
 
 param (
-    [string] $Image = "homelab-unbound:local",
-
-    [string] $GitHubOutputName
+    [string] $Image = "homelab-unbound:local"
 )
 
 # Stop on every error
@@ -42,18 +40,7 @@ try {
         Write-Error "Failed to detect Unbound version from image '$Image'."
     }
 
-    if ($GitHubOutputName) {
-        # Store version in $env:GITHUB_OUTPUT
-        if (-not $env:GITHUB_OUTPUT) {
-            Write-Error "GitHub output name '$GitHubOutputName' was specified, but GITHUB_OUTPUT is not set."
-        }
-
-        "$GitHubOutputName=$version" >> $env:GITHUB_OUTPUT
-    }
-    else {
-        # Return version
-        $version
-    }
+    $version
 
     ########################################################################
 }
