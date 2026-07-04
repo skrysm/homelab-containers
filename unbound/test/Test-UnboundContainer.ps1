@@ -268,6 +268,9 @@ try {
         if ($Platform) {
             $env:UNBOUND_TEST_PLATFORM = $Platform
         }
+        else {
+            Remove-Item Env:UNBOUND_TEST_PLATFORM -ErrorAction SilentlyContinue
+        }
 
         Write-DiagnosticsHeader
 
