@@ -124,3 +124,57 @@ jobs:
           # "unknown/unknown" architecture entry; that is fine and can be ignored.
           provenance: true
           sbom: true
+
+  verify-published:
+    name: Verify published image (${{ matrix.platform }})
+
+    needs:
+      - prepare
+      - publish
+
+    if: github.event_name != 'pull_request'
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            qemu_platform: ""
+          - platform: linux/arm64
+            qemu_platform: arm64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        if: matrix.qemu_platform != ''
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: ${{ matrix.qemu_platform }}
+
+      - name: Pull published image
+        shell: pwsh
+        run: |
+          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}'
+          $platform = '${{ matrix.platform }}'
+
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
+              docker pull --platform $platform $image
+              if ($LASTEXITCODE -eq 0) {
+                  exit 0
+              }
+
+              if ($attempt -lt 5) {
+                  Write-Host "Pull failed. Retrying in 10 seconds..."
+                  Start-Sleep -Seconds 10
+              }
+          }
+
+          exit $LASTEXITCODE
+
+      - name: Test published image
+        shell: pwsh
+        run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}' -Platform '${{ matrix.platform }}' -GitHubOutput
