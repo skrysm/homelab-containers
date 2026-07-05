@@ -78,7 +78,7 @@ jobs:
         run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:candidate -GitHubOutput
 
       # Detects whether any packages in the candidate image have changed compared to the latest
-      # published image and print the comparison to the GitHub Actions workflow summary.
+      # published image and prints the comparison to the GitHub Actions workflow summary.
       - name: Create package manifest comparison
         id: package_manifest_comparison
         shell: pwsh
@@ -132,6 +132,9 @@ jobs:
 
           $summaryLines >> $env:GITHUB_STEP_SUMMARY
 
+          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
+          exit 0
+
       - name: Decide whether publishing is needed (for scheduled runs)
         if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
         shell: pwsh
@@ -181,6 +184,9 @@ jobs:
               Write-Error "Cancellation request did not stop this run in time."
               exit 1
           }
+
+          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
+          exit 0
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
