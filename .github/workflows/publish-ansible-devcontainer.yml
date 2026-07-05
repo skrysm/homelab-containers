@@ -16,6 +16,12 @@ on:
 
 permissions:
   contents: read
+  packages: write # for publishing new container images
+
+env:
+  FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/ansible-devcontainer
+  # Don't push the image from PRs.
+  PUSH_IMAGE: ${{ github.event_name != 'pull_request' }}
 
 jobs:
   prepare:
@@ -60,3 +66,61 @@ jobs:
       - name: Test Ansible devcontainer
         shell: pwsh
         run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image ansible-devcontainer:candidate -GitHubOutput
+
+  # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
+  #   inside this workflow before the PR is merged to the main branch.
+  publish:
+    name: ${{ github.event_name == 'pull_request' && 'Build image only (dry run)' || 'Publish image' }}
+    needs: prepare
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        # NOTE: We skip this step here to make sure that these runs cannot push the container image by accident.
+        if: env.PUSH_IMAGE == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
+      - name: Publish multi-platform image${{ github.event_name == 'pull_request' && ' (dry run)' || '' }}
+        uses: docker/build-push-action@v7
+        with:
+          context: ./ansible-devcontainer
+          platforms: linux/amd64,linux/arm64
+          push: ${{ env.PUSH_IMAGE == 'true' }}
+          tags: |
+            ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
+            ${{ env.FINAL_IMAGE_NAME }}:latest
+          # NOTE: Labels can be inspected via:
+          #
+          #   docker image inspect ghcr.io/skrysm/homelab-containers/ansible-devcontainer:latest --format '{{ json .Config.Labels }}' | jq
+          #
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            build.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/ansible-devcontainer/Dockerfile
+          # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
+          # published image:
+          #
+          # * "provenance" records how the image was built
+          # * "SBOM" records the packages/artifacts found in the image
+          #
+          # NOTE: GitHub's container registry UI shows these attestation manifests as an extra
+          # "unknown/unknown" architecture entry; that is fine and can be ignored.
+          provenance: true
+          sbom: true
