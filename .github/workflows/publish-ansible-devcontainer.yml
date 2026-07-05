@@ -1,5 +1,5 @@
 name: Publish Ansible devcontainer image
-run-name: "Publish Ansible devcontainer image | ${{ github.event_name == 'workflow_dispatch' && 'Manual' || github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'push' && 'Push' || github.event_name }}"
+run-name: "Publish Ansible devcontainer image | ${{ github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual' || github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'push' && 'Push' || github.event_name }}"
 
 on:
   push:
@@ -12,11 +12,21 @@ on:
     paths:
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
+  schedule:
+    # Every day at 02:41 UTC.
+    - cron: "41 2 * * *"
   workflow_dispatch:
+    inputs:
+      treat_as_scheduled_run:
+        description: "Treat as 'scheduled' run (for testing purposes)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
   packages: write # for publishing new container images
+  actions: write  # for cancelling the workflow run
 
 env:
   FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/ansible-devcontainer
@@ -66,6 +76,112 @@ jobs:
       - name: Test Ansible devcontainer
         shell: pwsh
         run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image ansible-devcontainer:candidate -GitHubOutput
+
+      # Detects whether the Ansible version in the candidate image changed compared to the latest
+      # published image and prints the comparison to the GitHub Actions workflow summary.
+      - name: Create Ansible version comparison
+        id: ansible_version_comparison
+        shell: pwsh
+        run: |
+          $candidateVersion = '${{ steps.version.outputs.version }}'
+          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
+
+          docker manifest inspect "$publishedImage" *> $null
+          $publishedImageExists = $LASTEXITCODE -eq 0
+
+          $summaryLines = @(
+              "## Ansible version comparison"
+              ""
+              "**Candidate version:** ``$candidateVersion``"
+              ""
+              "**Comparison image:** ``$publishedImage``"
+              ""
+          )
+
+          if (-not $publishedImageExists) {
+              $ansibleVersionChanged = $true
+              $comparisonReason = "No previous published image was found at '$publishedImage'."
+          }
+          else {
+              $publishedVersion = ./ansible-devcontainer/Get-AnsibleVersion.ps1 -Image $publishedImage
+
+              $summaryLines += @(
+                  "**Published version:** ``$publishedVersion``"
+                  ""
+              )
+
+              if ($candidateVersion -eq $publishedVersion) {
+                  $ansibleVersionChanged = $false
+                  $comparisonReason = "The Ansible version is unchanged compared to '$publishedImage'."
+              }
+              else {
+                  $ansibleVersionChanged = $true
+                  $comparisonReason = "The Ansible version changed from '$publishedVersion' to '$candidateVersion'."
+              }
+          }
+
+          Write-Host "Ansible version comparison result: $comparisonReason"
+
+          "ansible_version_changed=$($ansibleVersionChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+          $summaryLines += $comparisonReason
+          $summaryLines >> $env:GITHUB_STEP_SUMMARY
+
+          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
+          exit 0
+
+      - name: Decide whether publishing is needed (for scheduled runs)
+        if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          function Write-PublishDecision([bool] $ShouldPublish, [string] $Reason) {
+              $decision = if ($ShouldPublish) { "✅ Publish image" } else { "⏭️ Do not publish image" }
+
+              Write-Host "$($decision): $Reason"
+
+              @(
+                  "## Publish decision"
+                  ""
+                  "**Decision:** $decision"
+                  ""
+                  "**Reason:** $Reason"
+              ) >> $env:GITHUB_STEP_SUMMARY
+          }
+
+          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
+
+          $shouldPublish = '${{ steps.ansible_version_comparison.outputs.ansible_version_changed }}' -eq 'true'
+
+          if ($shouldPublish) {
+              docker manifest inspect "$publishedImage" *> $null
+              $publishedImageExists = $LASTEXITCODE -eq 0
+
+              if ($publishedImageExists) {
+                  $reason = "The Ansible version changed compared to '$publishedImage'."
+              }
+              else {
+                  $reason = "No previous published image was found at '$publishedImage'."
+              }
+          }
+          else {
+              $reason = "The Ansible version is unchanged compared to '$publishedImage'."
+          }
+
+          Write-PublishDecision `
+              -ShouldPublish $shouldPublish `
+              -Reason $reason
+
+          if (-not $shouldPublish) {
+              gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}"
+              Start-Sleep -Seconds 30
+              Write-Error "Cancellation request did not stop this run in time."
+              exit 1
+          }
+
+          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
+          exit 0
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
