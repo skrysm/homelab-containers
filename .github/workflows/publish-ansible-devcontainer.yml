@@ -1,20 +1,20 @@
-name: Publish Unbound image
-run-name: "Publish Unbound image | ${{ github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual' || github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'push' && 'Push' || github.event_name }}"
+name: Publish Ansible devcontainer image
+run-name: "Publish Ansible devcontainer image | ${{ github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual' || github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'push' && 'Push' || github.event_name }}"
 
 on:
   push:
     branches:
       - main
     paths:
-      - ".github/workflows/publish-unbound.yml"
-      - "unbound/**"
+      - ".github/workflows/publish-ansible-devcontainer.yml"
+      - "ansible-devcontainer/**"
   pull_request: # mainly for Dependabot update PRs
     paths:
-      - ".github/workflows/publish-unbound.yml"
-      - "unbound/**"
+      - ".github/workflows/publish-ansible-devcontainer.yml"
+      - "ansible-devcontainer/**"
   schedule:
-    # Every day at 02:23 UTC.
-    - cron: "23 2 * * *"
+    # Every day at 02:41 UTC.
+    - cron: "41 2 * * *"
   workflow_dispatch:
     inputs:
       treat_as_scheduled_run:
@@ -29,7 +29,7 @@ permissions:
   actions: write  # for cancelling the workflow run
 
 env:
-  FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/unbound
+  FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/ansible-devcontainer
   # Don't push the image from PRs.
   PUSH_IMAGE: ${{ github.event_name != 'pull_request' }}
 
@@ -54,82 +54,77 @@ jobs:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
-          context: ./unbound
+          context: ./ansible-devcontainer
           platforms: linux/amd64
           load: true
-          tags: homelab-unbound:candidate
+          tags: ansible-devcontainer:candidate
 
-      - name: Detect Unbound version
+      - name: Detect Ansible version
         id: version
         shell: pwsh
         run: |
-          $version = ./unbound/Get-UnboundVersion.ps1 -Image homelab-unbound:candidate
+          $version = ./ansible-devcontainer/Get-AnsibleVersion.ps1 -Image ansible-devcontainer:candidate
 
           "version=$version" >> $env:GITHUB_OUTPUT
 
           @(
-              "## Unbound version"
+              "## Ansible version"
               ""
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Test Unbound container
+      - name: Test Ansible devcontainer
         shell: pwsh
-        run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:candidate -GitHubOutput
+        run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image ansible-devcontainer:candidate -GitHubOutput
 
-      # Detects whether any packages in the candidate image have changed compared to the latest
+      # Detects whether the Ansible version in the candidate image changed compared to the latest
       # published image and prints the comparison to the GitHub Actions workflow summary.
-      - name: Create package manifest comparison
-        id: package_manifest_comparison
+      - name: Create Ansible version comparison
+        id: ansible_version_comparison
         shell: pwsh
         run: |
-          $candidateImage = "homelab-unbound:candidate"
+          $candidateVersion = '${{ steps.version.outputs.version }}'
           $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
 
           docker manifest inspect "$publishedImage" *> $null
           $publishedImageExists = $LASTEXITCODE -eq 0
 
           $summaryLines = @(
-              "## Package manifest comparison"
+              "## Ansible version comparison"
+              ""
+              "**Candidate version:** ``$candidateVersion``"
               ""
               "**Comparison image:** ``$publishedImage``"
               ""
           )
 
           if (-not $publishedImageExists) {
-              $packageManifestChanged = $true
+              $ansibleVersionChanged = $true
               $comparisonReason = "No previous published image was found at '$publishedImage'."
-              $packageComparisonMarkdownLines = @()
           }
           else {
-              $packageComparison = ./scripts/Compare-AlpineImagePackages.ps1 `
-                  -PublishedImage $publishedImage `
-                  -CandidateImage $candidateImage `
-                  -PassThru
+              $publishedVersion = ./ansible-devcontainer/Get-AnsibleVersion.ps1 -Image $publishedImage
 
-              $packageManifestChanged = $packageComparison.PackageManifestChanged
-              $packageComparisonMarkdownLines = @($packageComparison.MarkdownLines)
+              $summaryLines += @(
+                  "**Published version:** ``$publishedVersion``"
+                  ""
+              )
 
-              if (-not $packageManifestChanged) {
-                  $comparisonReason = "No package version changes between the candidate image and '$publishedImage'."
-                  $packageComparisonMarkdownLines = @()
+              if ($candidateVersion -eq $publishedVersion) {
+                  $ansibleVersionChanged = $false
+                  $comparisonReason = "The Ansible version is unchanged compared to '$publishedImage'."
               }
               else {
-                  $comparisonReason = "At least one package version changed between the candidate image and '$publishedImage'."
+                  $ansibleVersionChanged = $true
+                  $comparisonReason = "The Ansible version changed from '$publishedVersion' to '$candidateVersion'."
               }
           }
 
-          Write-Host "Package manifest comparison result: $comparisonReason"
+          Write-Host "Ansible version comparison result: $comparisonReason"
 
-          "package_manifest_changed=$($packageManifestChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "ansible_version_changed=$($ansibleVersionChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
-          if ($packageComparisonMarkdownLines.Count -gt 0) {
-              $summaryLines += $packageComparisonMarkdownLines
-          }
-          elseif ($comparisonReason) {
-              $summaryLines += $comparisonReason
-          }
-
+          $summaryLines += $comparisonReason
           $summaryLines >> $env:GITHUB_STEP_SUMMARY
 
           # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
@@ -157,21 +152,21 @@ jobs:
 
           $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
 
-          $shouldPublish = '${{ steps.package_manifest_comparison.outputs.package_manifest_changed }}' -eq 'true'
+          $shouldPublish = '${{ steps.ansible_version_comparison.outputs.ansible_version_changed }}' -eq 'true'
 
           if ($shouldPublish) {
               docker manifest inspect "$publishedImage" *> $null
               $publishedImageExists = $LASTEXITCODE -eq 0
 
               if ($publishedImageExists) {
-                  $reason = "The package manifest changed compared to '$publishedImage'."
+                  $reason = "The Ansible version changed compared to '$publishedImage'."
               }
               else {
                   $reason = "No previous published image was found at '$publishedImage'."
               }
           }
           else {
-              $reason = "The package manifest is unchanged compared to '$publishedImage'."
+              $reason = "The Ansible version is unchanged compared to '$publishedImage'."
           }
 
           Write-PublishDecision `
@@ -204,7 +199,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
         with:
-          platforms: arm64,arm
+          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -221,22 +216,22 @@ jobs:
       - name: Publish multi-platform image${{ github.event_name == 'pull_request' && ' (dry run)' || '' }}
         uses: docker/build-push-action@v7
         with:
-          context: ./unbound
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          context: ./ansible-devcontainer
+          platforms: linux/amd64,linux/arm64
           push: ${{ env.PUSH_IMAGE == 'true' }}
           tags: |
             ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
           # NOTE: Labels can be inspected via:
           #
-          #   docker image inspect ghcr.io/skrysm/homelab-containers/unbound:latest --format '{{ json .Config.Labels }}' | jq
+          #   docker image inspect ghcr.io/skrysm/homelab-containers/ansible-devcontainer:latest --format '{{ json .Config.Labels }}' | jq
           #
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
             build.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/unbound/Dockerfile
+            build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/ansible-devcontainer/Dockerfile
           # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
           # published image:
           #
@@ -267,8 +262,6 @@ jobs:
             qemu_platform: ""
           - platform: linux/arm64
             qemu_platform: arm64
-          - platform: linux/arm/v7
-            qemu_platform: arm
 
     steps:
       - name: Check out repository
@@ -302,4 +295,4 @@ jobs:
 
       - name: Test published image
         shell: pwsh
-        run: ./unbound/test/Test-UnboundContainer.ps1 -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}' -Platform '${{ matrix.platform }}' -GitHubOutput
+        run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}' -Platform '${{ matrix.platform }}' -GitHubOutput
