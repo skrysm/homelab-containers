@@ -6,10 +6,12 @@ on:
     branches:
       - main
     paths:
+      - ".github/actions/compare-container-images/**"
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
   pull_request: # mainly for Dependabot update PRs
     paths:
+      - ".github/actions/compare-container-images/**"
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
   schedule:
@@ -77,58 +79,14 @@ jobs:
         shell: pwsh
         run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image ansible-devcontainer:candidate -GitHubOutput
 
-      # Detects whether the Ansible version in the candidate image changed compared to the latest
-      # published image and prints the comparison to the GitHub Actions workflow summary.
-      - name: Create Ansible version comparison
-        id: ansible_version_comparison
-        shell: pwsh
-        run: |
-          $candidateVersion = '${{ steps.version.outputs.version }}'
-          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
-
-          docker manifest inspect "$publishedImage" *> $null
-          $publishedImageExists = $LASTEXITCODE -eq 0
-
-          $summaryLines = @(
-              "## Ansible version comparison"
-              ""
-              "**Candidate version:** ``$candidateVersion``"
-              ""
-              "**Comparison image:** ``$publishedImage``"
-              ""
-          )
-
-          if (-not $publishedImageExists) {
-              $ansibleVersionChanged = $true
-              $comparisonReason = "No previous published image was found at '$publishedImage'."
-          }
-          else {
-              $publishedVersion = ./ansible-devcontainer/Get-AnsibleVersion.ps1 -Image $publishedImage
-
-              $summaryLines += @(
-                  "**Published version:** ``$publishedVersion``"
-                  ""
-              )
-
-              if ($candidateVersion -eq $publishedVersion) {
-                  $ansibleVersionChanged = $false
-                  $comparisonReason = "The Ansible version is unchanged compared to '$publishedImage'."
-              }
-              else {
-                  $ansibleVersionChanged = $true
-                  $comparisonReason = "The Ansible version changed from '$publishedVersion' to '$candidateVersion'."
-              }
-          }
-
-          Write-Host "Ansible version comparison result: $comparisonReason"
-
-          "ansible_version_changed=$($ansibleVersionChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-
-          $summaryLines += $comparisonReason
-          $summaryLines >> $env:GITHUB_STEP_SUMMARY
-
-          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-          exit 0
+      - name: Compare container images
+        id: container_image_comparison
+        uses: ./.github/actions/compare-container-images
+        with:
+          comparison-method: version
+          candidate-image: ansible-devcontainer:candidate
+          published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
+          version-script: ./ansible-devcontainer/Get-AnsibleVersion.ps1
 
       - name: Decide whether publishing is needed (for scheduled runs)
         if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
@@ -152,7 +110,7 @@ jobs:
 
           $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
 
-          $shouldPublish = '${{ steps.ansible_version_comparison.outputs.ansible_version_changed }}' -eq 'true'
+          $shouldPublish = '${{ steps.container_image_comparison.outputs.changes_detected }}' -eq 'true'
 
           if ($shouldPublish) {
               docker manifest inspect "$publishedImage" *> $null

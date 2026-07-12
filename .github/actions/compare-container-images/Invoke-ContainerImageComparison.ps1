@@ -2,56 +2,73 @@
 
 param (
     [Parameter(Mandatory = $true)]
+    [string] $ComparisonMethod,
+
+    [Parameter(Mandatory = $true)]
     [string] $CandidateImage,
 
     [Parameter(Mandatory = $true)]
-    [string] $PublishedImage
+    [string] $PublishedImage,
+
+    [string] $VersionScript
 )
 
-docker manifest inspect "$PublishedImage" *> $null
+$ErrorActionPreference = 'Stop'
+
+$comparisonTitle = switch ($ComparisonMethod) {
+    'package-manifest' { 'Package manifest' }
+    'version' { 'Image version' }
+    default { throw "Unsupported comparison method '$ComparisonMethod'. Supported methods are 'package-manifest' and 'version'." }
+}
+
+docker manifest inspect $PublishedImage *> $null
 $publishedImageExists = $LASTEXITCODE -eq 0
 
-$summaryLines = @(
-    "## Package manifest comparison"
-    ""
-    "**Comparison image:** ``$PublishedImage``"
-    ""
-)
-
 if (-not $publishedImageExists) {
-    $packageManifestChanged = $true
-    $comparisonReason = "No previous published image was found at '$PublishedImage'."
-    $packageComparisonMarkdownLines = @()
+    $comparisonResult = @{
+        Changed        = $true
+        OutcomeMessage = "Published image '$PublishedImage' doesn't exist."
+        DetailLines    = @()
+    }
 }
 else {
-    $packageComparison = ./scripts/Compare-AlpinePackageManifests.ps1 `
-        -PublishedImage $PublishedImage `
-        -CandidateImage $CandidateImage `
-        -PassThru
-
-    $packageManifestChanged = $packageComparison.PackageManifestChanged
-    $packageComparisonMarkdownLines = @($packageComparison.MarkdownLines)
-
-    if (-not $packageManifestChanged) {
-        $comparisonReason = "No package version changes between the candidate image and '$PublishedImage'."
-        $packageComparisonMarkdownLines = @()
-    }
-    else {
-        $comparisonReason = "At least one package version changed between the candidate image and '$PublishedImage'."
+    $comparisonResult = switch ($ComparisonMethod) {
+        'package-manifest' {
+            & "$PSScriptRoot/comparison-methods/Compare-AlpinePackageManifest.ps1" `
+                -CandidateImage $CandidateImage `
+                -PublishedImage $PublishedImage
+        }
+        'version' {
+            & "$PSScriptRoot/comparison-methods/Compare-ImageVersion.ps1" `
+                -CandidateImage $CandidateImage `
+                -PublishedImage $PublishedImage `
+                -VersionScript $VersionScript
+        }
     }
 }
 
-Write-Host "Package manifest comparison result: $comparisonReason"
-
-"changes_detected=$($packageManifestChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-
-if ($packageComparisonMarkdownLines.Count -gt 0) {
-    $summaryLines += $packageComparisonMarkdownLines
-}
-elseif ($comparisonReason) {
-    $summaryLines += $comparisonReason
+if ($null -eq $comparisonResult -or $null -eq $comparisonResult.Changed) {
+    throw "Comparison method '$ComparisonMethod' did not return a valid result."
 }
 
+$summaryLines = @(
+    "## $comparisonTitle comparison"
+    ''
+    "**Published comparison image:** ``$PublishedImage``"
+    ''
+)
+
+$detailLines = @($comparisonResult.DetailLines)
+if ($detailLines.Count -gt 0) {
+    $summaryLines += $detailLines
+    $summaryLines += ''
+}
+
+$summaryLines += $comparisonResult.OutcomeMessage
+
+Write-Host "Container image comparison result: $($comparisonResult.OutcomeMessage)"
+
+"changes_detected=$($comparisonResult.Changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 $summaryLines >> $env:GITHUB_STEP_SUMMARY
 
 # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.

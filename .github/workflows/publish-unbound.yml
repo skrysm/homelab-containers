@@ -81,12 +81,11 @@ jobs:
         shell: pwsh
         run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:candidate -GitHubOutput
 
-      # Detects whether any packages in the candidate image have changed compared to the latest
-      # published image and prints the comparison to the GitHub Actions workflow summary.
       - name: Compare container images
         id: container_image_comparison
         uses: ./.github/actions/compare-container-images
         with:
+          comparison-method: package-manifest
           candidate-image: homelab-unbound:candidate
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
