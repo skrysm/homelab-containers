@@ -6,16 +6,16 @@ on:
     branches:
       - main
     paths:
-      - ".github/actions/create-package-manifest-comparison/**"
+      - ".github/actions/compare-container-images/**"
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
-      - "scripts/Compare-AlpineImagePackages.ps1"
+      - "scripts/Compare-AlpinePackageManifests.ps1"
   pull_request: # mainly for Dependabot update PRs
     paths:
-      - ".github/actions/create-package-manifest-comparison/**"
+      - ".github/actions/compare-container-images/**"
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
-      - "scripts/Compare-AlpineImagePackages.ps1"
+      - "scripts/Compare-AlpinePackageManifests.ps1"
   schedule:
     # Every day at 02:23 UTC.
     - cron: "23 2 * * *"
@@ -83,9 +83,9 @@ jobs:
 
       # Detects whether any packages in the candidate image have changed compared to the latest
       # published image and prints the comparison to the GitHub Actions workflow summary.
-      - name: Create package manifest comparison
-        id: package_manifest_comparison
-        uses: ./.github/actions/create-package-manifest-comparison
+      - name: Compare container images
+        id: container_image_comparison
+        uses: ./.github/actions/compare-container-images
         with:
           candidate-image: homelab-unbound:candidate
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
@@ -112,7 +112,7 @@ jobs:
 
           $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
 
-          $shouldPublish = '${{ steps.package_manifest_comparison.outputs.package_manifest_changed }}' -eq 'true'
+          $shouldPublish = '${{ steps.container_image_comparison.outputs.changes_detected }}' -eq 'true'
 
           if ($shouldPublish) {
               docker manifest inspect "$publishedImage" *> $null

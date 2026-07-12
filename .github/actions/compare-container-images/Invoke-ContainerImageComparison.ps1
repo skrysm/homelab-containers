@@ -24,7 +24,7 @@ if (-not $publishedImageExists) {
     $packageComparisonMarkdownLines = @()
 }
 else {
-    $packageComparison = ./scripts/Compare-AlpineImagePackages.ps1 `
+    $packageComparison = ./scripts/Compare-AlpinePackageManifests.ps1 `
         -PublishedImage $PublishedImage `
         -CandidateImage $CandidateImage `
         -PassThru
@@ -43,7 +43,7 @@ else {
 
 Write-Host "Package manifest comparison result: $comparisonReason"
 
-"package_manifest_changed=$($packageManifestChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+"changes_detected=$($packageManifestChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
 if ($packageComparisonMarkdownLines.Count -gt 0) {
     $summaryLines += $packageComparisonMarkdownLines

@@ -5,7 +5,7 @@
 Compares installed Alpine packages between two Docker images and writes a Markdown change summary.
 
 .EXAMPLE
-./Compare-AlpineImagePackages.ps1 -PublishedImage alpine:3.23 -CandidateImage alpine:3.24
+./Compare-AlpinePackageManifests.ps1 -PublishedImage alpine:3.23 -CandidateImage alpine:3.24
 
 Exit code 0 means no package changes were found.
 Exit code 1 means at least one package changed.
