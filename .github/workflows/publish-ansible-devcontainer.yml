@@ -83,10 +83,10 @@ jobs:
         id: container_image_comparison
         uses: ./.github/actions/compare-container-images
         with:
+          build-context: ./ansible-devcontainer
           comparison-method: version
           candidate-image: ansible-devcontainer:candidate
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
-          version-script: ./ansible-devcontainer/Get-AnsibleVersion.ps1
 
       - name: Decide whether publishing is needed (for scheduled runs)
         if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run

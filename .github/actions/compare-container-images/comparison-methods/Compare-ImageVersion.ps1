@@ -2,24 +2,32 @@
 
 param (
     [Parameter(Mandatory = $true)]
+    [string] $BuildContext,
+
+    [Parameter(Mandatory = $true)]
     [string] $CandidateImage,
 
     [Parameter(Mandatory = $true)]
-    [string] $PublishedImage,
-
-    [Parameter(Mandatory = $true)]
-    [string] $VersionScript
+    [string] $PublishedImage
 )
 
-if (-not (Test-Path -LiteralPath $VersionScript -PathType Leaf)) {
-    throw "Version script '$VersionScript' was not found."
+$versionScripts = @(Get-ChildItem -LiteralPath $BuildContext -Filter 'Get-*Version.ps1' -File)
+
+if ($versionScripts.Count -eq 0) {
+    throw "No Get-*Version.ps1 script was found in build context '$BuildContext'."
+}
+elseif ($versionScripts.Count -gt 1) {
+    $versionScriptNames = $versionScripts.Name -join ', '
+    throw "Multiple Get-*Version.ps1 scripts were found in build context '$BuildContext': $versionScriptNames"
 }
 
+$versionScript = $versionScripts[0].FullName
+
 function Get-ImageVersion([string] $Image) {
-    $versionOutput = @(& $VersionScript -Image $Image)
+    $versionOutput = @(& $versionScript -Image $Image)
 
     if ($versionOutput.Count -ne 1 -or -not $versionOutput[0]) {
-        throw "Version script '$VersionScript' did not return exactly one version for image '$Image'."
+        throw "Version script '$versionScript' did not return exactly one version for image '$Image'."
     }
 
     return [string] $versionOutput[0]

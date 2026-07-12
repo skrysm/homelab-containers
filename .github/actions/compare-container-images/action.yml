@@ -2,6 +2,9 @@ name: Compare container images
 description: Compare a candidate container image with a previously published image.
 
 inputs:
+  build-context:
+    description: Build context directory associated with the container images.
+    required: true
   comparison-method:
     description: Comparison method to use. Supported values are "package-manifest" and "version".
     required: true
@@ -11,9 +14,6 @@ inputs:
   published-image:
     description: Published container image to compare against.
     required: true
-  version-script:
-    description: PowerShell script used to extract an image version when using the "version" method.
-    required: false
 
 outputs:
   changes_detected:
@@ -28,7 +28,7 @@ runs:
       shell: pwsh
       run: |
         & "$env:GITHUB_ACTION_PATH/Invoke-ContainerImageComparison.ps1" `
+            -BuildContext '${{ inputs.build-context }}' `
             -ComparisonMethod '${{ inputs.comparison-method }}' `
             -CandidateImage '${{ inputs.candidate-image }}' `
-            -PublishedImage '${{ inputs.published-image }}' `
-            -VersionScript '${{ inputs.version-script }}'
+            -PublishedImage '${{ inputs.published-image }}'

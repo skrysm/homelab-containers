@@ -2,18 +2,23 @@
 
 param (
     [Parameter(Mandatory = $true)]
+    [string] $BuildContext,
+
+    [Parameter(Mandatory = $true)]
     [string] $ComparisonMethod,
 
     [Parameter(Mandatory = $true)]
     [string] $CandidateImage,
 
     [Parameter(Mandatory = $true)]
-    [string] $PublishedImage,
-
-    [string] $VersionScript
+    [string] $PublishedImage
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not (Test-Path -LiteralPath $BuildContext -PathType Container)) {
+    throw "Build context '$BuildContext' was not found."
+}
 
 $comparisonTitle = switch ($ComparisonMethod) {
     'package-manifest' { 'Package manifest' }
@@ -40,9 +45,9 @@ else {
         }
         'version' {
             & "$PSScriptRoot/comparison-methods/Compare-ImageVersion.ps1" `
+                -BuildContext $BuildContext `
                 -CandidateImage $CandidateImage `
-                -PublishedImage $PublishedImage `
-                -VersionScript $VersionScript
+                -PublishedImage $PublishedImage
         }
     }
 }

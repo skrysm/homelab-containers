@@ -85,6 +85,7 @@ jobs:
         id: container_image_comparison
         uses: ./.github/actions/compare-container-images
         with:
+          build-context: ./unbound
           comparison-method: package-manifest
           candidate-image: homelab-unbound:candidate
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
