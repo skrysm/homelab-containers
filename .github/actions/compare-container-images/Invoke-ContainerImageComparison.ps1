@@ -51,8 +51,20 @@ if ($null -eq $comparisonResult -or $null -eq $comparisonResult.Changed) {
     throw "Comparison method '$ComparisonMethod' did not return a valid result."
 }
 
+$comparisonStatus = if (-not $publishedImageExists) {
+    '🆕 No published image'
+}
+elseif ($comparisonResult.Changed) {
+    '🔄 Changes detected'
+}
+else {
+    '✅ No changes detected'
+}
+
 $summaryLines = @(
     "## $comparisonTitle comparison"
+    ''
+    "**Result:** $comparisonStatus"
     ''
     "**Published comparison image:** ``$PublishedImage``"
     ''
