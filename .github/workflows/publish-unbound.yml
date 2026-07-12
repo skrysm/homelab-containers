@@ -6,12 +6,16 @@ on:
     branches:
       - main
     paths:
+      - ".github/actions/create-package-manifest-comparison/**"
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
+      - "scripts/Compare-AlpineImagePackages.ps1"
   pull_request: # mainly for Dependabot update PRs
     paths:
+      - ".github/actions/create-package-manifest-comparison/**"
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
+      - "scripts/Compare-AlpineImagePackages.ps1"
   schedule:
     # Every day at 02:23 UTC.
     - cron: "23 2 * * *"
@@ -81,59 +85,10 @@ jobs:
       # published image and prints the comparison to the GitHub Actions workflow summary.
       - name: Create package manifest comparison
         id: package_manifest_comparison
-        shell: pwsh
-        run: |
-          $candidateImage = "homelab-unbound:candidate"
-          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
-
-          docker manifest inspect "$publishedImage" *> $null
-          $publishedImageExists = $LASTEXITCODE -eq 0
-
-          $summaryLines = @(
-              "## Package manifest comparison"
-              ""
-              "**Comparison image:** ``$publishedImage``"
-              ""
-          )
-
-          if (-not $publishedImageExists) {
-              $packageManifestChanged = $true
-              $comparisonReason = "No previous published image was found at '$publishedImage'."
-              $packageComparisonMarkdownLines = @()
-          }
-          else {
-              $packageComparison = ./scripts/Compare-AlpineImagePackages.ps1 `
-                  -PublishedImage $publishedImage `
-                  -CandidateImage $candidateImage `
-                  -PassThru
-
-              $packageManifestChanged = $packageComparison.PackageManifestChanged
-              $packageComparisonMarkdownLines = @($packageComparison.MarkdownLines)
-
-              if (-not $packageManifestChanged) {
-                  $comparisonReason = "No package version changes between the candidate image and '$publishedImage'."
-                  $packageComparisonMarkdownLines = @()
-              }
-              else {
-                  $comparisonReason = "At least one package version changed between the candidate image and '$publishedImage'."
-              }
-          }
-
-          Write-Host "Package manifest comparison result: $comparisonReason"
-
-          "package_manifest_changed=$($packageManifestChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-
-          if ($packageComparisonMarkdownLines.Count -gt 0) {
-              $summaryLines += $packageComparisonMarkdownLines
-          }
-          elseif ($comparisonReason) {
-              $summaryLines += $comparisonReason
-          }
-
-          $summaryLines >> $env:GITHUB_STEP_SUMMARY
-
-          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-          exit 0
+        uses: ./.github/actions/create-package-manifest-comparison
+        with:
+          candidate-image: homelab-unbound:candidate
+          published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
       - name: Decide whether publishing is needed (for scheduled runs)
         if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
