@@ -7,11 +7,13 @@ on:
       - main
     paths:
       - ".github/actions/compare-container-images/**"
+      - ".github/actions/cancel-run-if-no-changes/**"
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
   pull_request: # mainly for Dependabot update PRs
     paths:
       - ".github/actions/compare-container-images/**"
+      - ".github/actions/cancel-run-if-no-changes/**"
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
   schedule:
@@ -90,56 +92,10 @@ jobs:
 
       - name: Decide whether publishing is needed (for scheduled runs)
         if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          function Write-PublishDecision([bool] $ShouldPublish, [string] $Reason) {
-              $decision = if ($ShouldPublish) { "✅ Publish image" } else { "⏭️ Do not publish image" }
-
-              Write-Host "$($decision): $Reason"
-
-              @(
-                  "## Publish decision"
-                  ""
-                  "**Decision:** $decision"
-                  ""
-                  "**Reason:** $Reason"
-              ) >> $env:GITHUB_STEP_SUMMARY
-          }
-
-          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
-
-          $shouldPublish = '${{ steps.container_image_comparison.outputs.changes_detected }}' -eq 'true'
-
-          if ($shouldPublish) {
-              docker manifest inspect "$publishedImage" *> $null
-              $publishedImageExists = $LASTEXITCODE -eq 0
-
-              if ($publishedImageExists) {
-                  $reason = "The Ansible version changed compared to '$publishedImage'."
-              }
-              else {
-                  $reason = "No previous published image was found at '$publishedImage'."
-              }
-          }
-          else {
-              $reason = "The Ansible version is unchanged compared to '$publishedImage'."
-          }
-
-          Write-PublishDecision `
-              -ShouldPublish $shouldPublish `
-              -Reason $reason
-
-          if (-not $shouldPublish) {
-              gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}"
-              Start-Sleep -Seconds 30
-              Write-Error "Cancellation request did not stop this run in time."
-              exit 1
-          }
-
-          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-          exit 0
+        uses: ./.github/actions/cancel-run-if-no-changes
+        with:
+          changes-detected: ${{ steps.container_image_comparison.outputs.changes_detected }}
+          published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
