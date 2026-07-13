@@ -65,7 +65,7 @@ jobs:
           load: true
           tags: ansible-devcontainer:candidate
 
-      - name: Detect Ansible version
+      - name: Detect container version
         id: version
         shell: pwsh
         run: |
@@ -79,7 +79,7 @@ jobs:
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Test Ansible devcontainer
+      - name: Test container
         shell: pwsh
         run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image ansible-devcontainer:candidate -GitHubOutput
 

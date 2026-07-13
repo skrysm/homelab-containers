@@ -67,7 +67,7 @@ jobs:
           load: true
           tags: homelab-unbound:candidate
 
-      - name: Detect Unbound version
+      - name: Detect container version
         id: version
         shell: pwsh
         run: |
@@ -81,7 +81,7 @@ jobs:
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Test Unbound container
+      - name: Test container
         shell: pwsh
         run: ./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:candidate -GitHubOutput
 
