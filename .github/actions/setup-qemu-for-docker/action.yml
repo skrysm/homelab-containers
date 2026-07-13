@@ -1,0 +1,49 @@
+name: Set up QEMU for Docker
+description: Set up the QEMU emulators required to run Docker platforms on the workflow runner.
+
+inputs:
+  platforms:
+    description: Comma-separated Docker platforms to configure, such as "linux/arm64,linux/arm/v7".
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve QEMU platforms
+      id: resolve_qemu_platforms
+      shell: pwsh
+      run: |
+        function Get-QemuPlatform($DockerPlatform) {
+            switch ($DockerPlatform.Trim()) {
+                'linux/amd64' { return '' } # native platform, no emulation needed
+                'linux/arm64' { return 'arm64' }
+                'linux/arm/v7' { return 'arm' }
+                default { throw "Unsupported Docker platform '$DockerPlatform'." }
+            }
+        }
+
+        $dockerPlatforms = '${{ inputs.platforms }}'.Split(',', [StringSplitOptions]::RemoveEmptyEntries)
+        if ($dockerPlatforms.Count -eq 0) {
+            throw 'At least one Docker platform must be specified.'
+        }
+
+        $qemuPlatforms = @()
+
+        foreach ($dockerPlatform in $dockerPlatforms) {
+            $qemuPlatform = Get-QemuPlatform $dockerPlatform
+            if ($qemuPlatform -eq '' -or $qemuPlatforms -contains $qemuPlatform) {
+                continue
+            }
+
+            $qemuPlatforms += $qemuPlatform
+        }
+
+        "qemu_platforms=$($qemuPlatforms -join ',')" >> $env:GITHUB_OUTPUT
+
+    - name: Set up QEMU
+      # Skip this step when only 'linux/amd64' was requested, because it is the runner's native
+      # platform and does not require emulation.
+      if: steps.resolve_qemu_platforms.outputs.qemu_platforms != ''
+      uses: docker/setup-qemu-action@v4
+      with:
+        platforms: ${{ steps.resolve_qemu_platforms.outputs.qemu_platforms }}

@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/actions/compare-container-images/**"
       - ".github/actions/cancel-run-if-no-changes/**"
+      - ".github/actions/setup-qemu-for-docker/**"
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
       - "scripts/Compare-AlpinePackageManifests.ps1"
@@ -15,6 +16,7 @@ on:
     paths:
       - ".github/actions/compare-container-images/**"
       - ".github/actions/cancel-run-if-no-changes/**"
+      - ".github/actions/setup-qemu-for-docker/**"
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
       - "scripts/Compare-AlpinePackageManifests.ps1"
@@ -112,10 +114,10 @@ jobs:
 
       # It's recommended to run this before "setup-buildx-action".
       # See: https://github.com/docker/setup-qemu-action#usage
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+      - name: Set up QEMU for Docker
+        uses: ./.github/actions/setup-qemu-for-docker
         with:
-          platforms: arm64,arm
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -173,23 +175,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: linux/amd64
-            qemu_platform: ""
-          - platform: linux/arm64
-            qemu_platform: arm64
-          - platform: linux/arm/v7
-            qemu_platform: arm
+        platform:
+          - linux/amd64
+          - linux/arm64
+          - linux/arm/v7
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
       - name: Set up QEMU
-        if: matrix.qemu_platform != ''
-        uses: docker/setup-qemu-action@v4
+        uses: ./.github/actions/setup-qemu-for-docker
         with:
-          platforms: ${{ matrix.qemu_platform }}
+          platforms: ${{ matrix.platform }}
 
       - name: Pull published image
         shell: pwsh
