@@ -1,5 +1,5 @@
-name: Publish Ansible devcontainer image
-run-name: "Publish Ansible devcontainer image | ${{ github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual' || github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'push' && 'Push' || github.event_name }}"
+name: Publish Unbound image
+run-name: "Publish Unbound image | ${{ github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual' || github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'push' && 'Push' || github.event_name }}"
 
 on:
   push:
@@ -8,17 +8,19 @@ on:
     paths:
       - ".github/actions/**"
       - ".github/workflows/_publish-container-image.yml"
-      - ".github/workflows/publish-ansible-devcontainer.yml"
-      - "ansible-devcontainer/**"
+      - ".github/workflows/publish-unbound.yml"
+      - "unbound/**"
+      - "scripts/Compare-AlpinePackageManifests.ps1"
   pull_request: # mainly for Renovate update PRs
     paths:
       - ".github/actions/**"
       - ".github/workflows/_publish-container-image.yml"
-      - ".github/workflows/publish-ansible-devcontainer.yml"
-      - "ansible-devcontainer/**"
+      - ".github/workflows/publish-unbound.yml"
+      - "unbound/**"
+      - "scripts/Compare-AlpinePackageManifests.ps1"
   schedule:
-    # Every day at 02:41 UTC.
-    - cron: "41 2 * * *"
+    # Every day at 02:23 UTC.
+    - cron: "23 2 * * *"
   workflow_dispatch:
     inputs:
       treat_as_scheduled_run:
@@ -35,7 +37,7 @@ jobs:
       actions: write  # for cancelling the workflow run
     uses: ./.github/workflows/_publish-container-image.yml
     with:
-      image-name: ansible-devcontainer
-      platforms: linux/amd64,linux/arm64
-      comparison-method: version
+      image-name: unbound
+      platforms: linux/amd64,linux/arm64,linux/arm/v7
+      comparison-method: package-manifest
       treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}
