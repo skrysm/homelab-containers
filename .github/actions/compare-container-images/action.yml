@@ -1,0 +1,34 @@
+name: Compare container images
+description: Compare a candidate container image with a previously published image.
+
+inputs:
+  build-context:
+    description: Build context directory associated with the container images.
+    required: true
+  comparison-method:
+    description: Comparison method to use. Supported values are "package-manifest" and "version".
+    required: true
+  candidate-image:
+    description: Candidate container image to compare.
+    required: true
+  published-image:
+    description: Published container image to compare against.
+    required: true
+
+outputs:
+  changes_detected:
+    description: Whether changes were detected between the candidate and published image.
+    value: ${{ steps.container_image_comparison.outputs.changes_detected }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compare container images
+      id: container_image_comparison
+      shell: pwsh
+      run: |
+        & "$env:GITHUB_ACTION_PATH/Invoke-ContainerImageComparison.ps1" `
+            -BuildContext '${{ inputs.build-context }}' `
+            -ComparisonMethod '${{ inputs.comparison-method }}' `
+            -CandidateImage '${{ inputs.candidate-image }}' `
+            -PublishedImage '${{ inputs.published-image }}'

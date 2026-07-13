@@ -6,10 +6,16 @@ on:
     branches:
       - main
     paths:
+      - ".github/actions/compare-container-images/**"
+      - ".github/actions/cancel-run-if-no-changes/**"
+      - ".github/actions/setup-qemu-for-docker/**"
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
   pull_request: # mainly for Dependabot update PRs
     paths:
+      - ".github/actions/compare-container-images/**"
+      - ".github/actions/cancel-run-if-no-changes/**"
+      - ".github/actions/setup-qemu-for-docker/**"
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
   schedule:
@@ -59,7 +65,7 @@ jobs:
           load: true
           tags: ansible-devcontainer:candidate
 
-      - name: Detect Ansible version
+      - name: Detect container version
         id: version
         shell: pwsh
         run: |
@@ -73,115 +79,25 @@ jobs:
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Test Ansible devcontainer
+      - name: Test container
         shell: pwsh
         run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image ansible-devcontainer:candidate -GitHubOutput
 
-      # Detects whether the Ansible version in the candidate image changed compared to the latest
-      # published image and prints the comparison to the GitHub Actions workflow summary.
-      - name: Create Ansible version comparison
-        id: ansible_version_comparison
-        shell: pwsh
-        run: |
-          $candidateVersion = '${{ steps.version.outputs.version }}'
-          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
-
-          docker manifest inspect "$publishedImage" *> $null
-          $publishedImageExists = $LASTEXITCODE -eq 0
-
-          $summaryLines = @(
-              "## Ansible version comparison"
-              ""
-              "**Candidate version:** ``$candidateVersion``"
-              ""
-              "**Comparison image:** ``$publishedImage``"
-              ""
-          )
-
-          if (-not $publishedImageExists) {
-              $ansibleVersionChanged = $true
-              $comparisonReason = "No previous published image was found at '$publishedImage'."
-          }
-          else {
-              $publishedVersion = ./ansible-devcontainer/Get-AnsibleVersion.ps1 -Image $publishedImage
-
-              $summaryLines += @(
-                  "**Published version:** ``$publishedVersion``"
-                  ""
-              )
-
-              if ($candidateVersion -eq $publishedVersion) {
-                  $ansibleVersionChanged = $false
-                  $comparisonReason = "The Ansible version is unchanged compared to '$publishedImage'."
-              }
-              else {
-                  $ansibleVersionChanged = $true
-                  $comparisonReason = "The Ansible version changed from '$publishedVersion' to '$candidateVersion'."
-              }
-          }
-
-          Write-Host "Ansible version comparison result: $comparisonReason"
-
-          "ansible_version_changed=$($ansibleVersionChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-
-          $summaryLines += $comparisonReason
-          $summaryLines >> $env:GITHUB_STEP_SUMMARY
-
-          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-          exit 0
+      - name: Compare container images
+        id: container_image_comparison
+        uses: ./.github/actions/compare-container-images
+        with:
+          build-context: ./ansible-devcontainer
+          comparison-method: version
+          candidate-image: ansible-devcontainer:candidate
+          published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
       - name: Decide whether publishing is needed (for scheduled runs)
         if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          function Write-PublishDecision([bool] $ShouldPublish, [string] $Reason) {
-              $decision = if ($ShouldPublish) { "✅ Publish image" } else { "⏭️ Do not publish image" }
-
-              Write-Host "$($decision): $Reason"
-
-              @(
-                  "## Publish decision"
-                  ""
-                  "**Decision:** $decision"
-                  ""
-                  "**Reason:** $Reason"
-              ) >> $env:GITHUB_STEP_SUMMARY
-          }
-
-          $publishedImage = "${{ env.FINAL_IMAGE_NAME }}:latest"
-
-          $shouldPublish = '${{ steps.ansible_version_comparison.outputs.ansible_version_changed }}' -eq 'true'
-
-          if ($shouldPublish) {
-              docker manifest inspect "$publishedImage" *> $null
-              $publishedImageExists = $LASTEXITCODE -eq 0
-
-              if ($publishedImageExists) {
-                  $reason = "The Ansible version changed compared to '$publishedImage'."
-              }
-              else {
-                  $reason = "No previous published image was found at '$publishedImage'."
-              }
-          }
-          else {
-              $reason = "The Ansible version is unchanged compared to '$publishedImage'."
-          }
-
-          Write-PublishDecision `
-              -ShouldPublish $shouldPublish `
-              -Reason $reason
-
-          if (-not $shouldPublish) {
-              gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}"
-              Start-Sleep -Seconds 30
-              Write-Error "Cancellation request did not stop this run in time."
-              exit 1
-          }
-
-          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-          exit 0
+        uses: ./.github/actions/cancel-run-if-no-changes
+        with:
+          changes-detected: ${{ steps.container_image_comparison.outputs.changes_detected }}
+          published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
@@ -196,10 +112,10 @@ jobs:
 
       # It's recommended to run this before "setup-buildx-action".
       # See: https://github.com/docker/setup-qemu-action#usage
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+      - name: Set up QEMU for Docker
+        uses: ./.github/actions/setup-qemu-for-docker
         with:
-          platforms: arm64
+          platforms: linux/amd64,linux/arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -257,21 +173,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: linux/amd64
-            qemu_platform: ""
-          - platform: linux/arm64
-            qemu_platform: arm64
+        platform:
+          - linux/amd64
+          - linux/arm64
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
       - name: Set up QEMU
-        if: matrix.qemu_platform != ''
-        uses: docker/setup-qemu-action@v4
+        uses: ./.github/actions/setup-qemu-for-docker
         with:
-          platforms: ${{ matrix.qemu_platform }}
+          platforms: ${{ matrix.platform }}
 
       - name: Pull published image
         shell: pwsh
