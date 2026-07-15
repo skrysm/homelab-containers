@@ -1,0 +1,26 @@
+name: Detect changed container images
+description: Determine which container images need validation based on the files changed in a pull request.
+
+inputs:
+  base-sha:
+    description: Base commit SHA for the changed-file comparison.
+    required: true
+  head-sha:
+    description: Head commit SHA for the changed-file comparison.
+    required: true
+
+outputs:
+  changed_images:
+    description: A JSON array containing the names of the container images that need validation.
+    value: ${{ steps.changes.outputs.changed_images }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect changed container images
+      id: changes
+      shell: pwsh
+      run: |
+        & "$env:GITHUB_ACTION_PATH/Find-ChangedContainerImages.ps1" `
+            -BaseSha '${{ inputs.base-sha }}' `
+            -HeadSha '${{ inputs.head-sha }}'

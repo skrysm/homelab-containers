@@ -11,13 +11,6 @@ on:
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
       - "scripts/Compare-AlpinePackageManifests.ps1"
-  pull_request: # mainly for Renovate update PRs
-    paths:
-      - ".github/actions/**"
-      - ".github/workflows/_publish-container-image.yml"
-      - ".github/workflows/publish-unbound.yml"
-      - "unbound/**"
-      - "scripts/Compare-AlpinePackageManifests.ps1"
   schedule:
     # Every day at 02:23 UTC.
     - cron: "23 2 * * *"
@@ -28,6 +21,8 @@ on:
         type: boolean
         required: false
         default: false
+  # PR validation is orchestrated by "build-gate.yml".
+  workflow_call:
 
 jobs:
   publish-container-image:

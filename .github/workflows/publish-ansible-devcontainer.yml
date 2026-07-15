@@ -10,12 +10,6 @@ on:
       - ".github/workflows/_publish-container-image.yml"
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
-  pull_request: # mainly for Renovate update PRs
-    paths:
-      - ".github/actions/**"
-      - ".github/workflows/_publish-container-image.yml"
-      - ".github/workflows/publish-ansible-devcontainer.yml"
-      - "ansible-devcontainer/**"
   schedule:
     # Every day at 02:41 UTC.
     - cron: "41 2 * * *"
@@ -26,6 +20,8 @@ on:
         type: boolean
         required: false
         default: false
+  # PR validation is orchestrated by "build-gate.yml".
+  workflow_call:
 
 jobs:
   publish-container-image:
