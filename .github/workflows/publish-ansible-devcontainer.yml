@@ -6,16 +6,8 @@ on:
     branches:
       - main
     paths:
-      - ".github/actions/compare-container-images/**"
-      - ".github/actions/cancel-run-if-no-changes/**"
-      - ".github/actions/setup-qemu-for-docker/**"
-      - ".github/workflows/publish-ansible-devcontainer.yml"
-      - "ansible-devcontainer/**"
-  pull_request: # mainly for Dependabot update PRs
-    paths:
-      - ".github/actions/compare-container-images/**"
-      - ".github/actions/cancel-run-if-no-changes/**"
-      - ".github/actions/setup-qemu-for-docker/**"
+      - ".github/actions/**"
+      - ".github/workflows/_publish-container-image.yml"
       - ".github/workflows/publish-ansible-devcontainer.yml"
       - "ansible-devcontainer/**"
   schedule:
@@ -28,184 +20,18 @@ on:
         type: boolean
         required: false
         default: false
-
-permissions:
-  contents: read
-  packages: write # for publishing new container images
-  actions: write  # for cancelling the workflow run
-
-env:
-  FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/ansible-devcontainer
-  # Don't push the image from PRs.
-  PUSH_IMAGE: ${{ github.event_name != 'pull_request' }}
+  # PR validation is orchestrated by "build-gate.yml".
+  workflow_call:
 
 jobs:
-  prepare:
-    name: Prepare image build
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build candidate image
-        uses: docker/build-push-action@v7
-        env:
-          # See: https://github.com/docker/build-push-action/tree/v7/#environment-variables
-          DOCKER_BUILD_SUMMARY: false
-          DOCKER_BUILD_RECORD_UPLOAD: false
-        with:
-          context: ./ansible-devcontainer
-          platforms: linux/amd64
-          load: true
-          tags: ansible-devcontainer:candidate
-
-      - name: Detect container version
-        id: version
-        shell: pwsh
-        run: |
-          $version = ./ansible-devcontainer/Get-AnsibleVersion.ps1 -Image ansible-devcontainer:candidate
-
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-          @(
-              "## Ansible version"
-              ""
-              "**Detected version:** ``$version``"
-          ) >> $env:GITHUB_STEP_SUMMARY
-
-      - name: Test container
-        shell: pwsh
-        run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image ansible-devcontainer:candidate -GitHubOutput
-
-      - name: Compare container images
-        id: container_image_comparison
-        uses: ./.github/actions/compare-container-images
-        with:
-          build-context: ./ansible-devcontainer
-          comparison-method: version
-          candidate-image: ansible-devcontainer:candidate
-          published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
-
-      - name: Decide whether publishing is needed (for scheduled runs)
-        if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
-        uses: ./.github/actions/cancel-run-if-no-changes
-        with:
-          changes-detected: ${{ steps.container_image_comparison.outputs.changes_detected }}
-          published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
-
-  # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
-  #   inside this workflow before the PR is merged to the main branch.
-  publish:
-    name: ${{ github.event_name == 'pull_request' && 'Build image only (dry run)' || 'Publish image' }}
-    needs: prepare
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      # It's recommended to run this before "setup-buildx-action".
-      # See: https://github.com/docker/setup-qemu-action#usage
-      - name: Set up QEMU for Docker
-        uses: ./.github/actions/setup-qemu-for-docker
-        with:
-          platforms: linux/amd64,linux/arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GitHub Container Registry
-        # NOTE: We skip this step here to make sure that these runs cannot push the container image by accident.
-        if: env.PUSH_IMAGE == 'true'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish multi-platform image${{ github.event_name == 'pull_request' && ' (dry run)' || '' }}
-        uses: docker/build-push-action@v7
-        with:
-          context: ./ansible-devcontainer
-          platforms: linux/amd64,linux/arm64
-          push: ${{ env.PUSH_IMAGE == 'true' }}
-          tags: |
-            ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
-            ${{ env.FINAL_IMAGE_NAME }}:latest
-          # NOTE: Labels can be inspected via:
-          #
-          #   docker image inspect ghcr.io/skrysm/homelab-containers/ansible-devcontainer:latest --format '{{ json .Config.Labels }}' | jq
-          #
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
-            build.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/ansible-devcontainer/Dockerfile
-          # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
-          # published image:
-          #
-          # * "provenance" records how the image was built
-          # * "SBOM" records the packages/artifacts found in the image
-          #
-          # NOTE: GitHub's container registry UI shows these attestation manifests as an extra
-          # "unknown/unknown" architecture entry; that is fine and can be ignored.
-          provenance: true
-          sbom: true
-
-  verify-published:
-    name: Verify published image (${{ matrix.platform }})
-
-    needs:
-      - prepare
-      - publish
-
-    if: github.event_name != 'pull_request'
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm64
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up QEMU
-        uses: ./.github/actions/setup-qemu-for-docker
-        with:
-          platforms: ${{ matrix.platform }}
-
-      - name: Pull published image
-        shell: pwsh
-        run: |
-          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}'
-          $platform = '${{ matrix.platform }}'
-
-          for ($attempt = 1; $attempt -le 5; $attempt++) {
-              docker pull --platform $platform $image
-              if ($LASTEXITCODE -eq 0) {
-                  exit 0
-              }
-
-              if ($attempt -lt 5) {
-                  Write-Host "Pull failed. Retrying in 10 seconds..."
-                  Start-Sleep -Seconds 10
-              }
-          }
-
-          exit $LASTEXITCODE
-
-      - name: Test published image
-        shell: pwsh
-        run: ./ansible-devcontainer/test/Test-AnsibleContainer.ps1 -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}' -Platform '${{ matrix.platform }}' -GitHubOutput
+  publish-container-image:
+    permissions:
+      contents: read
+      packages: write # for publishing new container images
+      actions: write  # for cancelling the workflow run
+    uses: ./.github/workflows/_publish-container-image.yml
+    with:
+      image-name: ansible-devcontainer
+      platforms: linux/amd64,linux/arm64
+      comparison-method: version
+      treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}

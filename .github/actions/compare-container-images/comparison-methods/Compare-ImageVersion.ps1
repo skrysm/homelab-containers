@@ -11,17 +11,11 @@ param (
     [string] $PublishedImage
 )
 
-$versionScripts = @(Get-ChildItem -LiteralPath $BuildContext -Filter 'Get-*Version.ps1' -File)
+$versionScript = Join-Path $BuildContext 'Get-ContainerVersion.ps1'
 
-if ($versionScripts.Count -eq 0) {
-    throw "No Get-*Version.ps1 script was found in build context '$BuildContext'."
+if (-not (Test-Path -LiteralPath $versionScript -PathType Leaf)) {
+    throw "Version script '$versionScript' was not found."
 }
-elseif ($versionScripts.Count -gt 1) {
-    $versionScriptNames = $versionScripts.Name -join ', '
-    throw "Multiple Get-*Version.ps1 scripts were found in build context '$BuildContext': $versionScriptNames"
-}
-
-$versionScript = $versionScripts[0].FullName
 
 function Get-ImageVersion([string] $Image) {
     $versionOutput = @(& $versionScript -Image $Image)

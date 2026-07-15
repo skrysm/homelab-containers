@@ -15,7 +15,7 @@ It checks three cases:
 3. A real-world DNS name resolves through Unbound.
 
 .EXAMPLE
-./unbound/test/Test-UnboundContainer.ps1 -Image homelab-unbound:local
+./unbound/test/Test-Container.ps1 -Image homelab-unbound:local
 #>
 
 param (
