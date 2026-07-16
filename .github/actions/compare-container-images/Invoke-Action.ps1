@@ -39,12 +39,12 @@ if (-not $publishedImageExists) {
 else {
     $comparisonResult = switch ($ComparisonMethod) {
         'package-manifest' {
-            & "$PSScriptRoot/comparison-methods/Compare-AlpinePackageManifest.ps1" `
+            & "$PSScriptRoot/comparison-methods/Invoke-AlpinePackageManifestComparison.ps1" `
                 -CandidateImage $CandidateImage `
                 -PublishedImage $PublishedImage
         }
         'version' {
-            & "$PSScriptRoot/comparison-methods/Compare-ImageVersion.ps1" `
+            & "$PSScriptRoot/comparison-methods/Invoke-ImageVersionComparison.ps1" `
                 -BuildContext $BuildContext `
                 -CandidateImage $CandidateImage `
                 -PublishedImage $PublishedImage

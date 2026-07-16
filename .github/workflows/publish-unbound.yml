@@ -10,7 +10,6 @@ on:
       - ".github/workflows/_publish-container-image.yml"
       - ".github/workflows/publish-unbound.yml"
       - "unbound/**"
-      - "scripts/Compare-AlpinePackageManifests.ps1"
   schedule:
     # Every day at 02:23 UTC.
     - cron: "23 2 * * *"

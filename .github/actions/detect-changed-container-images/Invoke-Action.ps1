@@ -43,7 +43,6 @@ $ansibleDevcontainerChanged = $sharedPublishingChanged -or (Test-PathChanged @(
 
 $unboundChanged = $sharedPublishingChanged -or (Test-PathChanged @(
     '.github/workflows/publish-unbound.yml'
-    'scripts/Compare-AlpinePackageManifests.ps1'
     'unbound/*'
 ))
 

@@ -8,7 +8,7 @@ param (
     [string] $PublishedImage
 )
 
-$comparison = ./scripts/Compare-AlpinePackageManifests.ps1 `
+$comparison = & "$PSScriptRoot/Compare-AlpinePackageManifests.ps1" `
     -PublishedImage $PublishedImage `
     -CandidateImage $CandidateImage `
     -PassThru
