@@ -67,3 +67,6 @@ $changedImagesJson = ConvertTo-Json -InputObject $changedImages -Compress
     "| Ansible devcontainer | $ansibleDevcontainerChanged |"
     "| Unbound | $unboundChanged |"
 ) >> $env:GITHUB_STEP_SUMMARY
+
+# Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
+exit 0
