@@ -20,8 +20,6 @@ on:
         type: boolean
         required: false
         default: false
-  # PR validation is orchestrated by "build-gate.yml".
-  workflow_call:
 
 jobs:
   publish-container-image:
@@ -32,6 +30,4 @@ jobs:
     uses: ./.github/workflows/_publish-container-image.yml
     with:
       image-name: unbound
-      platforms: linux/amd64,linux/arm64,linux/arm/v7
-      comparison-method: package-manifest
       treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}

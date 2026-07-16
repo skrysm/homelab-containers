@@ -4,15 +4,7 @@ on:
   workflow_call:
     inputs:
       image-name:
-        description: Name of the image in the GitHub Container Registry package.
-        type: string
-        required: true
-      platforms:
-        description: Comma-separated Docker platforms to publish and verify.
-        type: string
-        required: true
-      comparison-method:
-        description: Method used to compare the candidate and published images.
+        description: Name of the image and its build-context directory containing container-image-config.yml.
         type: string
         required: true
       treat_as_scheduled_run:
@@ -35,31 +27,53 @@ jobs:
     name: Prepare image build
     runs-on: ubuntu-latest
     outputs:
-      platform_matrix: ${{ steps.platforms.outputs.platform_matrix }}
+      platforms: ${{ steps.configuration.outputs.platforms }}
+      platform_matrix: ${{ steps.configuration.outputs.platform_matrix }}
       # Pull request runs build and test the image without publishing it.
       publish_image: ${{ github.event_name != 'pull_request' }}
       version: ${{ steps.version.outputs.version }}
 
     steps:
-      - name: Resolve Docker platforms
-        id: platforms
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Load container image configuration
+        id: configuration
         shell: pwsh
         run: |
+          $configurationPath = './${{ inputs.image-name }}/container-image-config.yml'
+
+          if (-not (Test-Path $configurationPath -PathType Leaf)) {
+              throw "Container image configuration '$configurationPath' was not found."
+          }
+
+          # Convert YAML to JSON first as PowerShell doesn't support YAML natively.
+          $configurationJson = & yq eval --output-format json --indent 0 '.' $configurationPath
+          if ($LASTEXITCODE -ne 0) {
+              throw "Failed to parse container image configuration '$configurationPath'."
+          }
+
+          $configuration = ConvertFrom-Json -InputObject $configurationJson
+
           $platforms = @(
-              '${{ inputs.platforms }}'.Split(',') |
-                  ForEach-Object { $_.Trim() } |
+              $configuration.docker_platforms |
+                  ForEach-Object { ([string] $_).Trim() } |
                   Where-Object { $_ } |
                   Select-Object -Unique
           )
 
           if ($platforms.Count -eq 0) {
-              throw 'At least one Docker platform must be specified.'
+              throw "Container image configuration '$configurationPath' must specify at least one Docker platform."
           }
 
-          "platform_matrix=$(ConvertTo-Json -InputObject @($platforms) -Compress)" >> $env:GITHUB_OUTPUT
+          $comparisonMethod = ([string] $configuration.comparison_method).Trim()
 
-      - name: Check out repository
-        uses: actions/checkout@v7
+          "platforms=$($platforms -join ',')" >> $env:GITHUB_OUTPUT
+          "platform_matrix=$(ConvertTo-Json -InputObject @($platforms) -Compress)" >> $env:GITHUB_OUTPUT
+          "comparison_method=$comparisonMethod" >> $env:GITHUB_OUTPUT
+
+          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
+          exit 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -100,7 +114,7 @@ jobs:
         uses: ./.github/actions/compare-container-images
         with:
           build-context: ./${{ inputs.image-name }}
-          comparison-method: ${{ inputs.comparison-method }}
+          comparison-method: ${{ steps.configuration.outputs.comparison_method }}
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
@@ -127,7 +141,7 @@ jobs:
       - name: Set up QEMU for Docker
         uses: ./.github/actions/setup-qemu-for-docker
         with:
-          platforms: ${{ inputs.platforms }}
+          platforms: ${{ needs.prepare.outputs.platforms }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -145,7 +159,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: ./${{ inputs.image-name }}
-          platforms: ${{ inputs.platforms }}
+          platforms: ${{ needs.prepare.outputs.platforms }}
           push: ${{ needs.prepare.outputs.publish_image == 'true' }}
           tags: |
             ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}

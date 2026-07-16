@@ -28,33 +28,28 @@ jobs:
           base-sha: ${{ github.event.pull_request.base.sha }}
           head-sha: ${{ github.event.pull_request.head.sha }}
 
-  validate-ansible-devcontainer:
-    name: Validate Ansible devcontainer image
+  validate-container-images:
+    name: Validate ${{ matrix.image }} image
     needs: detect-changes
-    if: contains(fromJSON(needs.detect-changes.outputs.changed_images), 'ansible-devcontainer')
+    if: needs.detect-changes.outputs.changed_images != '[]'
     permissions:
       contents: read
       packages: write
       actions: write
-    uses: ./.github/workflows/publish-ansible-devcontainer.yml
-
-  validate-unbound:
-    name: Validate Unbound image
-    needs: detect-changes
-    if: contains(fromJSON(needs.detect-changes.outputs.changed_images), 'unbound')
-    permissions:
-      contents: read
-      packages: write
-      actions: write
-    uses: ./.github/workflows/publish-unbound.yml
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.detect-changes.outputs.changed_images) }}
+    uses: ./.github/workflows/_publish-container-image.yml
+    with:
+      image-name: ${{ matrix.image }}
 
   # This job is the required check in the GitHub PR ruleset.
   build-gate:
     name: Build gate
     needs:
       - detect-changes
-      - validate-ansible-devcontainer
-      - validate-unbound
+      - validate-container-images
     # NOTE: This job must always run - even if no container images have been touched. This is important because
     #   this job is the required check for all PRs and PRs that don't touch any container images wouldn't be able
     #   merge without this.
@@ -71,32 +66,15 @@ jobs:
           }
 
           $changedImages = @(ConvertFrom-Json -InputObject '${{ needs.detect-changes.outputs.changed_images }}')
+          $validationResult = '${{ needs.validate-container-images.result }}'
 
-          #
-          # Gather results of all container jobs and check that all jobs for changed containers have actually succeeded.
-          #
-          # NOTE: We explicitly check for "changed" - not just for "not skipped" - to be more "defensive". Meaning,
-          #   if a container job was skipped accidentally, this gate job would still fail. For regular PRs this is
-          #   not that important - but it's important for Renovate PRs that get merged automatically (and thus there
-          #   is no human supervision that would catch this error).
-          #
-          $validations = @(
-              @{
-                  Image = 'Ansible devcontainer'
-                  Changed = $changedImages -contains 'ansible-devcontainer'
-                  Result = '${{ needs.validate-ansible-devcontainer.result }}'
-              }
-              @{
-                  Image = 'Unbound'
-                  Changed = $changedImages -contains 'unbound'
-                  Result = '${{ needs.validate-unbound.result }}'
-              }
-          )
+          Write-Host "Changed images: $($changedImages -join ', ')"
+          Write-Host "Container image validation result: $validationResult"
 
-          foreach ($validation in $validations) {
-              Write-Host ("{0}: changed={1}, result={2}" -f $validation.Image, $validation.Changed, $validation.Result)
+          if ($changedImages.Count -eq 0 -and $validationResult -ne 'skipped') {
+              throw 'Container image validation was not skipped even though no container images changed.'
+          }
 
-              if ($validation.Changed -and $validation.Result -ne 'success') {
-                  throw "$($validation.Image) validation did not succeed."
-              }
+          if ($changedImages.Count -gt 0 -and $validationResult -ne 'success') {
+              throw 'Container image validation did not succeed.'
           }

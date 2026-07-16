@@ -1,0 +1,4 @@
+docker_platforms:
+  - linux/amd64
+  - linux/arm64
+comparison_method: version
