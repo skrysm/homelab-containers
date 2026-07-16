@@ -21,6 +21,6 @@ runs:
       id: changes
       shell: pwsh
       run: |
-        & "$env:GITHUB_ACTION_PATH/Find-ChangedContainerImages.ps1" `
+        & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
             -BaseSha '${{ inputs.base-sha }}' `
             -HeadSha '${{ inputs.head-sha }}'

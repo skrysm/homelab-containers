@@ -27,7 +27,7 @@ runs:
       id: container_image_comparison
       shell: pwsh
       run: |
-        & "$env:GITHUB_ACTION_PATH/Invoke-ContainerImageComparison.ps1" `
+        & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
             -BuildContext '${{ inputs.build-context }}' `
             -ComparisonMethod '${{ inputs.comparison-method }}' `
             -CandidateImage '${{ inputs.candidate-image }}' `

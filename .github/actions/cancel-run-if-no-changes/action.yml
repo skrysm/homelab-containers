@@ -17,7 +17,7 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        & "$env:GITHUB_ACTION_PATH/Cancel-RunIfNoChanges.ps1" `
+        & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
             -ChangesDetected '${{ inputs.changes-detected }}' `
             -PublishedImage '${{ inputs.published-image }}' `
             -RunId '${{ github.run_id }}' `
