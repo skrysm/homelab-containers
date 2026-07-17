@@ -51,16 +51,12 @@ foreach ($directory in (Get-ChildItem -Path . -Directory)) {
 # Make the order of execution predictable/consistent across runs
 [Array]::Sort($imageNames)
 
-$containerImages = @()
 $changedImages = @()
 
 foreach ($imageName in $imageNames) {
     $validationRequired = $sharedFilesChanged -or (Test-PathChanged "$imageName/*")
 
-    $containerImages += @{
-        Name               = $imageName
-        ValidationRequired = $validationRequired
-    }
+    Write-Host "Container image '$imageName': validation required = $validationRequired"
 
     if ($validationRequired) {
         $changedImages += $imageName
@@ -70,18 +66,15 @@ foreach ($imageName in $imageNames) {
 $changedImagesJson = ConvertTo-Json -InputObject $changedImages -Compress
 "changed_images=$changedImagesJson" >> $env:GITHUB_OUTPUT
 
-$summaryLines = @(
-    '## Container image change detection'
-    ''
-    '| Image | Validation required |'
-    '| ----- | ------------------- |'
-)
-
-foreach ($containerImage in $containerImages) {
-    $summaryLines += "| $($containerImage.Name) | $($containerImage.ValidationRequired) |"
+# Only add a summary to this action if none(!) of the container images require validation.
+# If any of them requires validation, each will add its own summary to the workflow runs.
+if ($changedImages.Count -eq 0) {
+    @(
+        '## Container image validation'
+        ''
+        'No container images require validation.'
+    ) >> $env:GITHUB_STEP_SUMMARY
 }
-
-$summaryLines >> $env:GITHUB_STEP_SUMMARY
 
 # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
 exit 0
