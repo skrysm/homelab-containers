@@ -22,7 +22,7 @@ if (-not (Test-Path -LiteralPath $BuildContext -PathType Container)) {
 
 $comparisonTitle = switch ($ComparisonMethod) {
     'package-manifest' { 'Package manifest' }
-    'version' { 'Image version' }
+    'version' { 'Container image version' }
     default { throw "Unsupported comparison method '$ComparisonMethod'. Supported methods are 'package-manifest' and 'version'." }
 }
 

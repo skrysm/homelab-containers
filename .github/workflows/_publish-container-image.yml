@@ -90,16 +90,20 @@ jobs:
           load: true
           tags: ${{ env.CANDIDATE_IMAGE }}
 
-      - name: Detect container version
+      - name: Determine container image version
         id: version
         shell: pwsh
         run: |
-          $version = & './${{ inputs.image-name }}/Get-ContainerVersion.ps1' -Image '${{ env.CANDIDATE_IMAGE }}'
+          $version = & './${{ inputs.image-name }}/Get-ContainerImageVersion.ps1' -Image '${{ env.CANDIDATE_IMAGE }}'
 
           "version=$version" >> $env:GITHUB_OUTPUT
 
           @(
               "## Container image version"
+              ""
+              "The primary software version detected inside the candidate image is used as the container image tag."
+              ""
+              "**Image:** ``${{ inputs.image-name }}``"
               ""
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 #
-# Detects the version tag for the Unbound image.
+# Determines the container image version from the installed Unbound application.
 #
 
 param (
