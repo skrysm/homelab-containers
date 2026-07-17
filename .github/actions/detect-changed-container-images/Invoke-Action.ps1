@@ -30,9 +30,11 @@ function Test-PathChanged($Patterns) {
     return $false
 }
 
-$sharedPublishingChanged = Test-PathChanged @(
+$sharedFilesChanged = Test-PathChanged @(
     '.github/actions/*'
     '.github/workflows/_publish-container-image.yml'
+    # Include this file so changes to the "build-gate" workflow trigger builds for all(!) images.
+    # Without it, all image builds would be skipped.
     '.github/workflows/build-gate.yml'
 )
 
@@ -53,10 +55,7 @@ $containerImages = @()
 $changedImages = @()
 
 foreach ($imageName in $imageNames) {
-    $validationRequired = $sharedPublishingChanged -or (Test-PathChanged @(
-        ".github/workflows/publish-$imageName.yml"
-        "$imageName/*"
-    ))
+    $validationRequired = $sharedFilesChanged -or (Test-PathChanged "$imageName/*")
 
     $containerImages += @{
         Name               = $imageName
