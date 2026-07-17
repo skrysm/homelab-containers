@@ -1,9 +1,19 @@
-name: Build gate
-run-name: "Build gate | PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+name: Container images
+run-name: "Container images | ${{ github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || 'Push' }}"
 
 on:
-  # Always run so the required gate job is reported even when no container image changed.
+  # IMPORTANT: Always run this workflow (i.e. no path filter) so the required gate job is reported
+  # even when no container images have changed.
   pull_request:
+
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/actions/**"
+      - ".github/workflows/_publish-container-image.yml"
+      - ".github/workflows/container-images.yml"
+      - "container-images/**"
 
 permissions:
   contents: read
@@ -25,11 +35,11 @@ jobs:
         id: changes
         uses: ./.github/actions/detect-changed-container-images
         with:
-          base-sha: ${{ github.event.pull_request.base.sha }}
-          head-sha: ${{ github.event.pull_request.head.sha }}
+          base-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          head-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
   validate-container-images:
-    name: Validate ${{ matrix.image }} image
+    name: ${{ github.event_name == 'pull_request' && 'Validate' || 'Publish' }} ${{ matrix.image }} image
     needs: detect-changes
     if: needs.detect-changes.outputs.changed_images != '[]'
     permissions:

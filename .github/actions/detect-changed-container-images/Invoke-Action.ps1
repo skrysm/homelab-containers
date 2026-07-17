@@ -36,9 +36,9 @@ function Test-PathChanged($Patterns) {
 $sharedFilesChanged = Test-PathChanged @(
     '.github/actions/*'
     '.github/workflows/_publish-container-image.yml'
-    # Include this file so changes to the "build-gate" workflow trigger builds for all(!) images.
+    # Include this file so changes to the "container-images" workflow trigger builds for all(!) images.
     # Without it, all image builds would be skipped.
-    '.github/workflows/build-gate.yml'
+    '.github/workflows/container-images.yml'
 )
 
 $imageNames = @()
