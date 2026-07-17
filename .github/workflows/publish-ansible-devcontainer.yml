@@ -9,7 +9,7 @@ on:
       - ".github/actions/**"
       - ".github/workflows/_publish-container-image.yml"
       - ".github/workflows/publish-ansible-devcontainer.yml"
-      - "ansible-devcontainer/**"
+      - "container-images/ansible-devcontainer/**"
   schedule:
     # Every day at 00:41 UTC.
     - cron: "41 0 * * *"

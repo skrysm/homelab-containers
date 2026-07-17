@@ -19,6 +19,7 @@ permissions:
   actions: write  # for cancelling the workflow run
 
 env:
+  BUILD_CONTEXT: container-images/${{ inputs.image-name }}
   CANDIDATE_IMAGE: ${{ inputs.image-name }}:candidate
   FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/${{ inputs.image-name }}
 
@@ -41,7 +42,7 @@ jobs:
         id: configuration
         shell: pwsh
         run: |
-          $configurationPath = './${{ inputs.image-name }}/container-image-config.yml'
+          $configurationPath = './${{ env.BUILD_CONTEXT }}/container-image-config.yml'
 
           if (-not (Test-Path $configurationPath -PathType Leaf)) {
               throw "Container image configuration '$configurationPath' was not found."
@@ -85,7 +86,7 @@ jobs:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
         with:
-          context: ./${{ inputs.image-name }}
+          context: ./${{ env.BUILD_CONTEXT }}
           platforms: linux/amd64
           load: true
           tags: ${{ env.CANDIDATE_IMAGE }}
@@ -94,7 +95,7 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = & './${{ inputs.image-name }}/Get-ContainerImageVersion.ps1' -Image '${{ env.CANDIDATE_IMAGE }}'
+          $version = & './${{ env.BUILD_CONTEXT }}/Get-ContainerImageVersion.ps1' -Image '${{ env.CANDIDATE_IMAGE }}'
 
           "version=$version" >> $env:GITHUB_OUTPUT
 
@@ -111,13 +112,13 @@ jobs:
       - name: Test container
         shell: pwsh
         run: |
-          & './${{ inputs.image-name }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
+          & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
 
       - name: Compare container images
         id: container_image_comparison
         uses: ./.github/actions/compare-container-images
         with:
-          build-context: ./${{ inputs.image-name }}
+          build-context: ./${{ env.BUILD_CONTEXT }}
           comparison-method: ${{ steps.configuration.outputs.comparison_method }}
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
@@ -162,7 +163,7 @@ jobs:
       - name: ${{ needs.prepare.outputs.publish_image == 'true' && 'Publish multi-platform image' || 'Publish multi-platform image (dry run)' }}
         uses: docker/build-push-action@v7
         with:
-          context: ./${{ inputs.image-name }}
+          context: ./${{ env.BUILD_CONTEXT }}
           platforms: ${{ needs.prepare.outputs.platforms }}
           push: ${{ needs.prepare.outputs.publish_image == 'true' }}
           tags: |
@@ -177,7 +178,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
             build.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/${{ inputs.image-name }}/Dockerfile
+            build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/${{ env.BUILD_CONTEXT }}/Dockerfile
           # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
           # published image:
           #
@@ -237,7 +238,7 @@ jobs:
       - name: Test published image
         shell: pwsh
         run: |
-          & './${{ inputs.image-name }}/test/Test-Container.ps1' `
+          & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
               -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}' `
               -Platform '${{ matrix.platform }}' `
               -GitHubOutput

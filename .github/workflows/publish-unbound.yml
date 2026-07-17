@@ -9,7 +9,7 @@ on:
       - ".github/actions/**"
       - ".github/workflows/_publish-container-image.yml"
       - ".github/workflows/publish-unbound.yml"
-      - "unbound/**"
+      - "container-images/unbound/**"
   schedule:
     # Every day at 00:23 UTC.
     - cron: "23 0 * * *"

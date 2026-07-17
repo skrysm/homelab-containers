@@ -17,7 +17,7 @@ It checks these cases:
 5. Ansible can execute a local ping module invocation.
 
 .EXAMPLE
-./ansible-devcontainer/test/Test-Container.ps1 -Image ansible-devcontainer:local
+./Test-Container.ps1 -Image ansible-devcontainer:local
 #>
 
 param (

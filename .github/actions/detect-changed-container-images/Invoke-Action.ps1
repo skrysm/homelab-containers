@@ -10,6 +10,9 @@ param (
 
 $ErrorActionPreference = 'Stop'
 
+# NOTE: Must not(!) start with "./" because "git diff" returns the paths without this prefix.
+$IMAGES_BASE_PATH = 'container-images'
+
 $changedFiles = @(
     git diff --name-only --no-renames "${BaseSha}...${HeadSha}" --
 )
@@ -40,7 +43,7 @@ $sharedFilesChanged = Test-PathChanged @(
 
 $imageNames = @()
 
-foreach ($directory in (Get-ChildItem -Path . -Directory)) {
+foreach ($directory in (Get-ChildItem -Path $IMAGES_BASE_PATH -Directory)) {
     $configurationPath = Join-Path $directory.FullName 'container-image-config.yml'
 
     if (Test-Path $configurationPath -PathType Leaf) {
@@ -54,7 +57,7 @@ foreach ($directory in (Get-ChildItem -Path . -Directory)) {
 $changedImages = @()
 
 foreach ($imageName in $imageNames) {
-    $validationRequired = $sharedFilesChanged -or (Test-PathChanged "$imageName/*")
+    $validationRequired = $sharedFilesChanged -or (Test-PathChanged "$IMAGES_BASE_PATH/$imageName/*")
 
     Write-Host "Container image '$imageName': validation required = $validationRequired"
 
