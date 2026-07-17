@@ -36,37 +36,53 @@ $sharedPublishingChanged = Test-PathChanged @(
     '.github/workflows/build-gate.yml'
 )
 
-$ansibleDevcontainerChanged = $sharedPublishingChanged -or (Test-PathChanged @(
-    '.github/workflows/publish-ansible-devcontainer.yml'
-    'ansible-devcontainer/*'
-))
+$imageNames = @()
 
-$unboundChanged = $sharedPublishingChanged -or (Test-PathChanged @(
-    '.github/workflows/publish-unbound.yml'
-    'unbound/*'
-))
+foreach ($directory in (Get-ChildItem -Path . -Directory)) {
+    $configurationPath = Join-Path $directory.FullName 'container-image-config.yml'
 
-$changedImages = @()
-
-if ($ansibleDevcontainerChanged) {
-    $changedImages += 'ansible-devcontainer'
+    if (Test-Path $configurationPath -PathType Leaf) {
+        $imageNames += $directory.Name
+    }
 }
 
-if ($unboundChanged) {
-    $changedImages += 'unbound'
+# Make the order of execution predictable/consistent across runs
+[Array]::Sort($imageNames)
+
+$containerImages = @()
+$changedImages = @()
+
+foreach ($imageName in $imageNames) {
+    $validationRequired = $sharedPublishingChanged -or (Test-PathChanged @(
+        ".github/workflows/publish-$imageName.yml"
+        "$imageName/*"
+    ))
+
+    $containerImages += @{
+        Name               = $imageName
+        ValidationRequired = $validationRequired
+    }
+
+    if ($validationRequired) {
+        $changedImages += $imageName
+    }
 }
 
 $changedImagesJson = ConvertTo-Json -InputObject $changedImages -Compress
 "changed_images=$changedImagesJson" >> $env:GITHUB_OUTPUT
 
-@(
+$summaryLines = @(
     '## Container image change detection'
     ''
     '| Image | Validation required |'
-    '| --- | --- |'
-    "| Ansible devcontainer | $ansibleDevcontainerChanged |"
-    "| Unbound | $unboundChanged |"
-) >> $env:GITHUB_STEP_SUMMARY
+    '| ----- | ------------------- |'
+)
+
+foreach ($containerImage in $containerImages) {
+    $summaryLines += "| $($containerImage.Name) | $($containerImage.ValidationRequired) |"
+}
+
+$summaryLines >> $env:GITHUB_STEP_SUMMARY
 
 # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
 exit 0
