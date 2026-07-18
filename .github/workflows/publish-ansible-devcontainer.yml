@@ -1,10 +1,7 @@
 name: Publish Ansible devcontainer image
-run-name: "Publish Ansible devcontainer image | ${{ github.event_name == 'schedule' && 'Scheduled' || 'Manual' }}"
+run-name: "Publish Ansible devcontainer image"
 
 on:
-  schedule:
-    # Every day at 00:41 UTC.
-    - cron: "41 0 * * *"
   workflow_dispatch:
     inputs:
       treat_as_scheduled_run:
@@ -18,7 +15,6 @@ jobs:
     permissions:
       contents: read
       packages: write # for publishing new container images
-      actions: write  # for cancelling the workflow run
     uses: ./.github/workflows/_publish-container-image.yml
     with:
       image-name: ansible-devcontainer

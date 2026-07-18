@@ -16,7 +16,6 @@ on:
 permissions:
   contents: read
   packages: write # for publishing new container images
-  actions: write  # for cancelling the workflow run
 
 env:
   BUILD_CONTEXT: container-images/${{ inputs.image-name }}
@@ -30,8 +29,8 @@ jobs:
     outputs:
       platforms: ${{ steps.configuration.outputs.platforms }}
       platform_matrix: ${{ steps.configuration.outputs.platform_matrix }}
-      # Pull request runs build and test the image without publishing it.
-      publish_image: ${{ github.event_name != 'pull_request' }}
+      publish_image: ${{ steps.publish_decision.outputs.publish_image }}
+      continue_workflow: ${{ steps.publish_decision.outputs.continue_workflow }}
       version: ${{ steps.version.outputs.version }}
 
     steps:
@@ -123,18 +122,35 @@ jobs:
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
-      - name: Decide whether publishing is needed (for scheduled runs)
-        if: github.event_name == 'schedule' || inputs.treat_as_scheduled_run
-        uses: ./.github/actions/cancel-run-if-no-changes
-        with:
-          changes-detected: ${{ steps.container_image_comparison.outputs.changes_detected }}
-          published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
+      - name: Determine publishing behavior
+        id: publish_decision
+        shell: pwsh
+        run: |
+          $changesDetected = switch ('${{ steps.container_image_comparison.outputs.changes_detected }}') {
+              'true' { $true }
+              'false' { $false }
+              default { throw "Invalid changes-detected value '$_'. Expected 'true' or 'false'." }
+          }
+          $isPullRequest = '${{ github.event_name }}' -eq 'pull_request'
+          $isScheduledRun = '${{ github.event_name }}' -eq 'schedule' -or '${{ inputs.treat_as_scheduled_run }}' -eq 'true'
+
+          # Stop scheduled runs when no changes were detected; continue in any other case.
+          $continueWorkflow = (-not $isScheduledRun) -or $changesDetected
+          # Pull requests never publish; other runs publish only if the workflow continues.
+          $publishImage = (-not $isPullRequest) -and $continueWorkflow
+
+          Write-Host "Continue workflow: $continueWorkflow"
+          Write-Host "Publish image: $publishImage"
+
+          "continue_workflow=$($continueWorkflow.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "publish_image=$($publishImage.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
   # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
   #   inside this workflow before the PR is merged to the main branch.
   publish:
     name: ${{ needs.prepare.outputs.publish_image == 'true' && 'Publish image' || 'Build image only (dry run)' }}
     needs: prepare
+    if: needs.prepare.outputs.continue_workflow == 'true'
     runs-on: ubuntu-latest
 
     steps:

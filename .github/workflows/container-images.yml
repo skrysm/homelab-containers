@@ -1,5 +1,5 @@
 name: Container images
-run-name: "Container images | ${{ github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || 'Push' }}"
+run-name: "Container images | ${{ github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'schedule' && 'Scheduled' || 'Push' }}"
 
 on:
   # IMPORTANT: Always run this workflow (i.e. no path filter) so the required gate job is reported
@@ -15,15 +15,19 @@ on:
       - ".github/workflows/container-images.yml"
       - "container-images/**"
 
+  schedule:
+    # Every day at 00:23 UTC.
+    - cron: "23 0 * * *"
+
 permissions:
   contents: read
 
 jobs:
-  detect-changes:
-    name: Detect changed container images
+  select-container-images:
+    name: Select container images
     runs-on: ubuntu-latest
     outputs:
-      changed_images: ${{ steps.changes.outputs.changed_images }}
+      selected_images: ${{ steps.selection.outputs.selected_images }}
 
     steps:
       - name: Check out repository
@@ -32,24 +36,24 @@ jobs:
           fetch-depth: 0
 
       - name: Select container images
-        id: changes
+        id: selection
         uses: ./.github/actions/select-container-images
         with:
-          base-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          base-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || github.sha }}
           head-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          selection-mode: ${{ github.event_name == 'schedule' && 'all' || 'changed' }}
 
   validate-container-images:
-    name: ${{ github.event_name == 'pull_request' && 'Validate' || 'Publish' }} ${{ matrix.image }} image
-    needs: detect-changes
-    if: needs.detect-changes.outputs.changed_images != '[]'
+    name: "${{ github.event_name == 'pull_request' && 'Validate' || 'Publish' }}: ${{ matrix.image }}"
+    needs: select-container-images
+    if: needs.select-container-images.outputs.selected_images != '[]'
     permissions:
       contents: read
       packages: write
-      actions: write
     strategy:
       fail-fast: false
       matrix:
-        image: ${{ fromJSON(needs.detect-changes.outputs.changed_images) }}
+        image: ${{ fromJSON(needs.select-container-images.outputs.selected_images) }}
     uses: ./.github/workflows/_publish-container-image.yml
     with:
       image-name: ${{ matrix.image }}
@@ -58,33 +62,33 @@ jobs:
   build-gate:
     name: Build gate
     needs:
-      - detect-changes
+      - select-container-images
       - validate-container-images
     # NOTE: This job must always run - even if no container images have been touched. This is important because
     #   this job is the required check for all PRs and PRs that don't touch any container images wouldn't be able
     #   merge without this.
-    if: always()
-    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-slim
 
     steps:
       - name: Verify required image validations succeeded
         shell: pwsh
         run: |
           # Required because of "if: always()"
-          if ('${{ needs.detect-changes.result }}' -ne 'success') {
-              throw 'Container image change detection did not succeed.'
+          if ('${{ needs.select-container-images.result }}' -ne 'success') {
+              throw 'Container image selection did not succeed.'
           }
 
-          $changedImages = @(ConvertFrom-Json -InputObject '${{ needs.detect-changes.outputs.changed_images }}')
+          $selectedImages = @(ConvertFrom-Json -InputObject '${{ needs.select-container-images.outputs.selected_images }}')
           $validationResult = '${{ needs.validate-container-images.result }}'
 
-          Write-Host "Changed images: $($changedImages -join ', ')"
+          Write-Host "Selected images: $($selectedImages -join ', ')"
           Write-Host "Container image validation result: $validationResult"
 
-          if ($changedImages.Count -eq 0 -and $validationResult -ne 'skipped') {
-              throw 'Container image validation was not skipped even though no container images changed.'
+          if ($selectedImages.Count -eq 0 -and $validationResult -ne 'skipped') {
+              throw 'Container image validation was not skipped even though no container images were selected.'
           }
 
-          if ($changedImages.Count -gt 0 -and $validationResult -ne 'success') {
+          if ($selectedImages.Count -gt 0 -and $validationResult -ne 'success') {
               throw 'Container image validation did not succeed.'
           }

@@ -5,7 +5,10 @@ param (
     [string] $BaseSha,
 
     [Parameter(Mandatory = $true)]
-    [string] $HeadSha
+    [string] $HeadSha,
+
+    [ValidateSet('changed', 'all')]
+    [string] $SelectionMode = 'changed'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,34 +16,7 @@ $ErrorActionPreference = 'Stop'
 # NOTE: Must not(!) start with "./" because "git diff" returns the paths without this prefix.
 $IMAGES_BASE_PATH = 'container-images'
 
-$changedFiles = @(
-    git diff --name-only --no-renames "${BaseSha}...${HeadSha}" --
-)
-
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to determine changed files. Git exited with code $LASTEXITCODE."
-}
-
-function Test-PathChanged($Patterns) {
-    foreach ($file in $changedFiles) {
-        foreach ($pattern in $Patterns) {
-            if ($file -like $pattern) {
-                return $true
-            }
-        }
-    }
-
-    return $false
-}
-
-$sharedFilesChanged = Test-PathChanged @(
-    '.github/actions/*'
-    '.github/workflows/_publish-container-image.yml'
-    # Include this file so changes to the "container-images" workflow trigger builds for all(!) images.
-    # Without it, all image builds would be skipped.
-    '.github/workflows/container-images.yml'
-)
-
+$selectAllImages = $SelectionMode -eq 'all'
 $imageNames = @()
 
 foreach ($directory in (Get-ChildItem -Path $IMAGES_BASE_PATH -Directory)) {
@@ -54,24 +30,57 @@ foreach ($directory in (Get-ChildItem -Path $IMAGES_BASE_PATH -Directory)) {
 # Make the order of execution predictable/consistent across runs
 [Array]::Sort($imageNames)
 
-$changedImages = @()
+if ($selectAllImages) {
+    $selectedImages = @($imageNames)
+}
+else {
+    $changedFiles = @(
+        git diff --name-only --no-renames "${BaseSha}...${HeadSha}" --
+    )
 
-foreach ($imageName in $imageNames) {
-    $validationRequired = $sharedFilesChanged -or (Test-PathChanged "$IMAGES_BASE_PATH/$imageName/*")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to determine changed files. Git exited with code $LASTEXITCODE."
+    }
 
-    Write-Host "Container image '$imageName': validation required = $validationRequired"
+    function Test-PathChanged($Patterns) {
+        foreach ($file in $changedFiles) {
+            foreach ($pattern in $Patterns) {
+                if ($file -like $pattern) {
+                    return $true
+                }
+            }
+        }
 
-    if ($validationRequired) {
-        $changedImages += $imageName
+        return $false
+    }
+
+    $sharedFilesChanged = Test-PathChanged @(
+        '.github/actions/*'
+        '.github/workflows/_publish-container-image.yml'
+        # Include this file so changes to the "container-images" workflow trigger builds for all(!) images.
+        # Without it, all image builds would be skipped.
+        '.github/workflows/container-images.yml'
+    )
+
+    $selectedImages = @()
+
+    foreach ($imageName in $imageNames) {
+        $imageSelected = $sharedFilesChanged -or (Test-PathChanged "$IMAGES_BASE_PATH/$imageName/*")
+
+        Write-Host "Container image '$imageName': selected = $imageSelected"
+
+        if ($imageSelected) {
+            $selectedImages += $imageName
+        }
     }
 }
 
-$changedImagesJson = ConvertTo-Json -InputObject $changedImages -Compress
-"changed_images=$changedImagesJson" >> $env:GITHUB_OUTPUT
+$selectedImagesJson = ConvertTo-Json -InputObject $selectedImages -Compress
+"selected_images=$selectedImagesJson" >> $env:GITHUB_OUTPUT
 
-# Only add a summary to this action if none(!) of the container images require validation.
-# If any of them requires validation, each will add its own summary to the workflow runs.
-if ($changedImages.Count -eq 0) {
+# Only add a summary to this action if no container images were selected.
+# Selected images each add their own summary to the workflow run.
+if ($selectedImages.Count -eq 0) {
     @(
         '## Container image validation'
         ''
