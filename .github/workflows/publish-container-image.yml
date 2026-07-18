@@ -1,4 +1,5 @@
 name: Publish container image
+run-name: "Publish container image | ${{ inputs.image-name }}"
 
 on:
   workflow_call:
@@ -9,6 +10,21 @@ on:
         required: true
       treat_as_scheduled_run:
         description: "Treat as 'scheduled' run (for testing purposes)"
+        type: boolean
+        required: false
+        default: false
+
+  workflow_dispatch:
+    inputs:
+      image-name:
+        description: Container image to publish.
+        type: choice
+        required: true
+        options:
+          - ansible-devcontainer
+          - unbound
+      treat_as_scheduled_run:
+        description: "Treat as 'scheduled' run (for testing purposes)."
         type: boolean
         required: false
         default: false

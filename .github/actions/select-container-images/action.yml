@@ -9,7 +9,7 @@ inputs:
     description: Head commit SHA for the changed-file comparison.
     required: true
   selection-mode:
-    description: "Which images to selected. Supported values: 'changed' (changed
+    description: "Which images to select. Supported values: 'changed' (changed
       images only) and 'all' (all available images)."
     required: false
     default: changed

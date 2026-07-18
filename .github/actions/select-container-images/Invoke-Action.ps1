@@ -7,8 +7,9 @@ param (
     [Parameter(Mandatory = $true)]
     [string] $HeadSha,
 
+    [Parameter(Mandatory = $true)]
     [ValidateSet('changed', 'all')]
-    [string] $SelectionMode = 'changed'
+    [string] $SelectionMode
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,7 +17,6 @@ $ErrorActionPreference = 'Stop'
 # NOTE: Must not(!) start with "./" because "git diff" returns the paths without this prefix.
 $IMAGES_BASE_PATH = 'container-images'
 
-$selectAllImages = $SelectionMode -eq 'all'
 $imageNames = @()
 
 foreach ($directory in (Get-ChildItem -Path $IMAGES_BASE_PATH -Directory)) {
@@ -30,7 +30,7 @@ foreach ($directory in (Get-ChildItem -Path $IMAGES_BASE_PATH -Directory)) {
 # Make the order of execution predictable/consistent across runs
 [Array]::Sort($imageNames)
 
-if ($selectAllImages) {
+if ($SelectionMode -eq 'all') {
     $selectedImages = @($imageNames)
 }
 else {
@@ -56,7 +56,7 @@ else {
 
     $sharedFilesChanged = Test-PathChanged @(
         '.github/actions/*'
-        '.github/workflows/_publish-container-image.yml'
+        '.github/workflows/publish-container-image.yml'
         # Include this file so changes to the "container-images" workflow trigger builds for all(!) images.
         # Without it, all image builds would be skipped.
         '.github/workflows/container-images.yml'
