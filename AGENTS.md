@@ -8,6 +8,9 @@
 ## PowerShell Guidelines
 
 * For simple PowerShell functions, prefer inline parameter declarations (for example, `function Get-Value($InputValue) { ... }`) over a `param (...)` block. Use a `param (...)` block when advanced parameter features make it necessary.
+* Don't use `[PSCustomObject]` if a regular `@{ ... }` is enough.
+* When iterating items, prefer `foreach` over pipelines - unless the code can be expressed in an easy-to-read way in a single line.
+* Consider adding a few short comments to generated code. Especially, if the generated code is longer, use comments to explain the various larger code blocks.
 
 ## GitHub Actions Guidelines
 

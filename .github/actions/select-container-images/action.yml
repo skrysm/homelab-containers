@@ -1,0 +1,32 @@
+name: Select container images
+description: Select the container images to process based on the configured selection mode.
+
+inputs:
+  base-sha:
+    description: Base commit SHA for the changed-file comparison.
+    required: true
+  head-sha:
+    description: Head commit SHA for the changed-file comparison.
+    required: true
+  selection-mode:
+    description: "Which images to select. Supported values: 'changed' (changed
+      images only) and 'all' (all available images)."
+    required: false
+    default: changed
+
+outputs:
+  selected_images:
+    description: A JSON array containing the names of the selected container images.
+    value: ${{ steps.selection.outputs.selected_images }}
+
+runs:
+  using: composite
+  steps:
+    - name: Select container images
+      id: selection
+      shell: pwsh
+      run: |
+        & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
+            -BaseSha '${{ inputs.base-sha }}' `
+            -HeadSha '${{ inputs.head-sha }}' `
+            -SelectionMode '${{ inputs.selection-mode }}'
