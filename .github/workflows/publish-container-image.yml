@@ -39,14 +39,12 @@ env:
   FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/${{ inputs.image-name }}
 
 jobs:
-  prepare:
-    name: Prepare image build
+  build:
+    name: Build container image
     runs-on: ubuntu-latest
     outputs:
-      platforms: ${{ steps.configuration.outputs.platforms }}
       platform_matrix: ${{ steps.configuration.outputs.platform_matrix }}
       publish_image: ${{ steps.publish_decision.outputs.publish_image }}
-      continue_workflow: ${{ steps.publish_decision.outputs.continue_workflow }}
       version: ${{ steps.version.outputs.version }}
 
     steps:
@@ -90,6 +88,13 @@ jobs:
 
           # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
           exit 0
+
+      # It's recommended to run this before "setup-buildx-action".
+      # See: https://github.com/docker/setup-qemu-action#usage
+      - name: Set up QEMU for Docker
+        uses: ./.github/actions/setup-qemu-for-docker
+        with:
+          platforms: ${{ steps.configuration.outputs.platforms }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -161,45 +166,26 @@ jobs:
           "continue_workflow=$($continueWorkflow.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "publish_image=$($publishImage.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
-  # NOTE: We still do this job on PRs - even though we don't push the image - to detect any problems
-  #   inside this workflow before the PR is merged to the main branch.
-  publish:
-    name: ${{ needs.prepare.outputs.publish_image == 'true' && 'Publish image' || 'Build image only (dry run)' }}
-    needs: prepare
-    if: needs.prepare.outputs.continue_workflow == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      # It's recommended to run this before "setup-buildx-action".
-      # See: https://github.com/docker/setup-qemu-action#usage
-      - name: Set up QEMU for Docker
-        uses: ./.github/actions/setup-qemu-for-docker
-        with:
-          platforms: ${{ needs.prepare.outputs.platforms }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
       - name: Log in to GitHub Container Registry
         # NOTE: We skip this step here to make sure that these runs cannot push the container image by accident.
-        if: needs.prepare.outputs.publish_image == 'true'
+        if: steps.publish_decision.outputs.publish_image == 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: ${{ needs.prepare.outputs.publish_image == 'true' && 'Publish multi-platform image' || 'Publish multi-platform image (dry run)' }}
+      # NOTE: We still do this step on PRs - even though we don't push the image - to detect any problems
+      #   inside this workflow before the PR is merged to the main branch.
+      - name: ${{ steps.publish_decision.outputs.publish_image == 'true' && 'Publish multi-platform image' || 'Build multi-platform image (dry run)' }}
+        if: steps.publish_decision.outputs.continue_workflow == 'true'
         uses: docker/build-push-action@v7
         with:
           context: ./${{ env.BUILD_CONTEXT }}
-          platforms: ${{ needs.prepare.outputs.platforms }}
-          push: ${{ needs.prepare.outputs.publish_image == 'true' }}
+          platforms: ${{ steps.configuration.outputs.platforms }}
+          push: ${{ steps.publish_decision.outputs.publish_image == 'true' }}
           tags: |
-            ${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}
+            ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
           # NOTE: Labels can be inspected via:
           #
@@ -208,7 +194,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
             build.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/${{ env.BUILD_CONTEXT }}/Dockerfile
           # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
@@ -226,17 +212,16 @@ jobs:
     name: Verify published image (${{ matrix.platform }})
 
     needs:
-      - prepare
-      - publish
+      - build
 
-    if: needs.prepare.outputs.publish_image == 'true'
+    if: needs.build.outputs.publish_image == 'true'
 
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        platform: ${{ fromJSON(needs.prepare.outputs.platform_matrix) }}
+        platform: ${{ fromJSON(needs.build.outputs.platform_matrix) }}
 
     steps:
       - name: Check out repository
@@ -250,7 +235,7 @@ jobs:
       - name: Pull published image
         shell: pwsh
         run: |
-          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}'
+          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}'
           $platform = '${{ matrix.platform }}'
 
           for ($attempt = 1; $attempt -le 5; $attempt++) {
@@ -271,6 +256,6 @@ jobs:
         shell: pwsh
         run: |
           & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
-              -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.prepare.outputs.version }}' `
+              -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}' `
               -Platform '${{ matrix.platform }}' `
               -GitHubOutput
