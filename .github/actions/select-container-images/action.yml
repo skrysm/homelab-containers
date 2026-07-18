@@ -1,4 +1,4 @@
-name: Detect changed container images
+name: Select container images
 description: Determine which container images need validation based on the files changed in a pull request.
 
 inputs:
@@ -17,7 +17,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Detect changed container images
+    - name: Select container images
       id: changes
       shell: pwsh
       run: |

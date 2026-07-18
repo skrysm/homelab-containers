@@ -31,9 +31,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect changed container images
+      - name: Select container images
         id: changes
-        uses: ./.github/actions/detect-changed-container-images
+        uses: ./.github/actions/select-container-images
         with:
           base-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           head-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
