@@ -99,7 +99,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build candidate image
+      - name: Build candidate container image
         uses: docker/build-push-action@v7
         env:
           # See: https://github.com/docker/build-push-action/tree/v7/#environment-variables
@@ -111,7 +111,7 @@ jobs:
           load: true
           tags: ${{ env.CANDIDATE_IMAGE }}
 
-      - name: Determine container image version
+      - name: Determine candidate container image version
         id: version
         shell: pwsh
         run: |
@@ -129,12 +129,12 @@ jobs:
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Test container
+      - name: Test candidate container image
         shell: pwsh
         run: |
           & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
 
-      - name: Compare container images
+      - name: Compare candidate container image to latest published
         id: container_image_comparison
         uses: ./.github/actions/compare-container-images
         with:
@@ -143,7 +143,7 @@ jobs:
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
-      - name: Determine publishing behavior
+      - name: Decide on container publishing
         id: publish_decision
         shell: pwsh
         run: |
@@ -209,7 +209,7 @@ jobs:
           sbom: true
 
   verify-published:
-    name: Verify published image (${{ matrix.platform }})
+    name: Verify published container image (${{ matrix.platform }})
 
     needs:
       - build
