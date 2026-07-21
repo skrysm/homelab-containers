@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   select-container-images:
-    name: Select container images
+    name: Determine container images to process
     runs-on: ubuntu-latest
     outputs:
       selected_images: ${{ steps.selection.outputs.selected_images }}
