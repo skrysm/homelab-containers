@@ -50,7 +50,7 @@ env:
 
 jobs:
   build-and-publish:
-    name: "${{ inputs.publish && 'Publish' || 'Build' }} container image"
+    name: "${{ inputs.publish && 'Publish container image' || 'Build container image (no publish)' }}"
     runs-on: ubuntu-latest
     outputs:
       platform_matrix: ${{ steps.configuration.outputs.platform_matrix }}
