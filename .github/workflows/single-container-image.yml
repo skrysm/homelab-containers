@@ -121,7 +121,12 @@ jobs:
           load: true
           tags: ${{ env.CANDIDATE_IMAGE }}
 
-      - name: Determine candidate container image version
+      - name: Test candidate container image
+        shell: pwsh
+        run: |
+          & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
+
+      - name: Determine new container image tag
         id: version
         shell: pwsh
         run: |
@@ -139,11 +144,6 @@ jobs:
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Test candidate container image
-        shell: pwsh
-        run: |
-          & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
-
       - name: Compare candidate container image to latest published
         id: container_image_comparison
         uses: ./.github/actions/compare-container-images
@@ -153,7 +153,7 @@ jobs:
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
-      - name: Decide on container publishing
+      - name: Decide on image publishing
         id: publish_decision
         shell: pwsh
         run: |
@@ -187,7 +187,7 @@ jobs:
 
       # NOTE: We still do this step on PRs - even though we don't push the image - to detect any problems
       #   inside this workflow before the PR is merged to the main branch.
-      - name: ${{ steps.publish_decision.outputs.publish_image == 'true' && 'Publish multi-platform image' || 'Build multi-platform image (dry run)' }}
+      - name: ${{ steps.publish_decision.outputs.publish_image == 'true' && 'Publish multi-platform image' || 'Build multi-platform image (no publish)' }}
         if: steps.publish_decision.outputs.continue_workflow == 'true'
         uses: docker/build-push-action@v7
         with:
