@@ -1,12 +1,17 @@
 name: Single container image
-run-name: "Single container image | ${{ inputs.image-name }}"
+# NOTE: The run-name is irrelevant for runs triggered by the "workflow_call" trigger (as it's not shown anywhere in this case)
+run-name: "${{ inputs.publish && 'Publish' || 'Build' }} container image | ${{ inputs.image-name }}"
 
 on:
   workflow_call:
     inputs:
       image-name:
-        description: Name of the image and its build-context directory containing container-image-config.yml.
+        description: Container image to process.
         type: string
+        required: true
+      publish:
+        description: Publish the successfully validated container image.
+        type: boolean
         required: true
       treat_as_scheduled_run:
         description: "Treat as 'scheduled' run (for testing purposes)"
@@ -17,12 +22,17 @@ on:
   workflow_dispatch:
     inputs:
       image-name:
-        description: Container image to publish.
+        description: Container image to process.
         type: choice
         required: true
         options:
           - ansible-devcontainer
           - unbound
+      publish:
+        description: Publish the successfully validated container image.
+        type: boolean
+        required: false
+        default: false
       treat_as_scheduled_run:
         description: "Treat as 'scheduled' run (for testing purposes)."
         type: boolean
@@ -152,15 +162,15 @@ jobs:
               'false' { $false }
               default { throw "Invalid changes-detected value '$_'. Expected 'true' or 'false'." }
           }
-          $isPullRequest = '${{ github.event_name }}' -eq 'pull_request'
+          $publishRequested = '${{ inputs.publish }}' -eq 'true'
           $isScheduledRun = '${{ github.event_name }}' -eq 'schedule' -or '${{ inputs.treat_as_scheduled_run }}' -eq 'true'
 
           # Stop scheduled runs when no changes were detected; continue in any other case.
           $continueWorkflow = (-not $isScheduledRun) -or $changesDetected
-          # Pull requests never publish; other runs publish only if the workflow continues.
-          $publishImage = (-not $isPullRequest) -and $continueWorkflow
+          $publishImage = $publishRequested -and $continueWorkflow
 
           Write-Host "Continue workflow: $continueWorkflow"
+          Write-Host "Publish requested: $publishRequested"
           Write-Host "Publish image: $publishImage"
 
           "continue_workflow=$($continueWorkflow.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT

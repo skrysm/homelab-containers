@@ -44,6 +44,7 @@ jobs:
     uses: ./.github/workflows/single-container-image.yml
     with:
       image-name: ${{ matrix.image }}
+      publish: false
 
   # This job is the required check in the GitHub PR ruleset.
   build-gate:
