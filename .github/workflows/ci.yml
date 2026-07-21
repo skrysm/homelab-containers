@@ -1,0 +1,71 @@
+name: Continuous Integration
+run-name: "${{ github.event_name == 'schedule' && 'CI | Scheduled' || github.event_name == 'workflow_dispatch' && (inputs.publish && 'Publish all container images' || 'Build all container images (dry run)') || 'CI | Push' }}"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/actions/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/pr.yml"
+      - ".github/workflows/single-container-image.yml"
+      - "container-images/**"
+
+  schedule:
+    # Every day at 00:23 UTC.
+    - cron: "23 0 * * *"
+
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish successfully validated container images.
+        type: boolean
+        required: false
+        default: false
+      treat_as_scheduled_run:
+        description: "Treat as 'scheduled' run (for testing purposes)."
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  select-container-images:
+    name: Determine container images to process
+    runs-on: ubuntu-latest
+    outputs:
+      selected_images: ${{ steps.selection.outputs.selected_images }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Select container images
+        id: selection
+        uses: ./.github/actions/select-container-images
+        with:
+          base-sha: ${{ github.event_name == 'push' && github.event.before || github.sha }}
+          head-sha: ${{ github.sha }}
+          selection-mode: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'changed' }}
+
+  publish-container-images:
+    name: "${{ (github.event_name != 'workflow_dispatch' || inputs.publish) && 'Publish' || 'Validate' }}: ${{ matrix.image }}"
+    needs: select-container-images
+    if: needs.select-container-images.outputs.selected_images != '[]'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.select-container-images.outputs.selected_images) }}
+    uses: ./.github/workflows/single-container-image.yml
+    with:
+      image-name: ${{ matrix.image }}
+      publish: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+      treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}

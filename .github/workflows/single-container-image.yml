@@ -1,12 +1,17 @@
-name: Publish container image
-run-name: "Publish container image | ${{ inputs.image-name }}"
+name: Single container image
+# NOTE: The run-name is irrelevant for runs triggered by the "workflow_call" trigger (as it's not shown anywhere in this case)
+run-name: "${{ inputs.publish && 'Publish' || 'Build' }} container image | ${{ inputs.image-name }}"
 
 on:
   workflow_call:
     inputs:
       image-name:
-        description: Name of the image and its build-context directory containing container-image-config.yml.
+        description: Container image to process.
         type: string
+        required: true
+      publish:
+        description: Publish the successfully validated container image.
+        type: boolean
         required: true
       treat_as_scheduled_run:
         description: "Treat as 'scheduled' run (for testing purposes)"
@@ -17,12 +22,17 @@ on:
   workflow_dispatch:
     inputs:
       image-name:
-        description: Container image to publish.
+        description: Container image to process.
         type: choice
         required: true
         options:
           - ansible-devcontainer
           - unbound
+      publish:
+        description: Publish the successfully validated container image.
+        type: boolean
+        required: false
+        default: false
       treat_as_scheduled_run:
         description: "Treat as 'scheduled' run (for testing purposes)."
         type: boolean
@@ -39,8 +49,8 @@ env:
   FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/${{ inputs.image-name }}
 
 jobs:
-  build:
-    name: Build container image
+  build-and-publish:
+    name: "${{ inputs.publish && 'Publish container image' || 'Build container image (no publish)' }}"
     runs-on: ubuntu-latest
     outputs:
       platform_matrix: ${{ steps.configuration.outputs.platform_matrix }}
@@ -99,7 +109,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build candidate image
+      - name: Build candidate container image
         uses: docker/build-push-action@v7
         env:
           # See: https://github.com/docker/build-push-action/tree/v7/#environment-variables
@@ -111,7 +121,12 @@ jobs:
           load: true
           tags: ${{ env.CANDIDATE_IMAGE }}
 
-      - name: Determine container image version
+      - name: Test candidate container image
+        shell: pwsh
+        run: |
+          & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
+
+      - name: Determine new container image tag
         id: version
         shell: pwsh
         run: |
@@ -129,12 +144,7 @@ jobs:
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Test container
-        shell: pwsh
-        run: |
-          & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
-
-      - name: Compare container images
+      - name: Compare candidate container image to latest published
         id: container_image_comparison
         uses: ./.github/actions/compare-container-images
         with:
@@ -143,7 +153,7 @@ jobs:
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
-      - name: Determine publishing behavior
+      - name: Decide on image publishing
         id: publish_decision
         shell: pwsh
         run: |
@@ -152,15 +162,15 @@ jobs:
               'false' { $false }
               default { throw "Invalid changes-detected value '$_'. Expected 'true' or 'false'." }
           }
-          $isPullRequest = '${{ github.event_name }}' -eq 'pull_request'
+          $publishRequested = '${{ inputs.publish }}' -eq 'true'
           $isScheduledRun = '${{ github.event_name }}' -eq 'schedule' -or '${{ inputs.treat_as_scheduled_run }}' -eq 'true'
 
           # Stop scheduled runs when no changes were detected; continue in any other case.
           $continueWorkflow = (-not $isScheduledRun) -or $changesDetected
-          # Pull requests never publish; other runs publish only if the workflow continues.
-          $publishImage = (-not $isPullRequest) -and $continueWorkflow
+          $publishImage = $publishRequested -and $continueWorkflow
 
           Write-Host "Continue workflow: $continueWorkflow"
+          Write-Host "Publish requested: $publishRequested"
           Write-Host "Publish image: $publishImage"
 
           "continue_workflow=$($continueWorkflow.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
@@ -177,7 +187,7 @@ jobs:
 
       # NOTE: We still do this step on PRs - even though we don't push the image - to detect any problems
       #   inside this workflow before the PR is merged to the main branch.
-      - name: ${{ steps.publish_decision.outputs.publish_image == 'true' && 'Publish multi-platform image' || 'Build multi-platform image (dry run)' }}
+      - name: ${{ steps.publish_decision.outputs.publish_image == 'true' && 'Publish multi-platform image' || 'Build multi-platform image (no publish)' }}
         if: steps.publish_decision.outputs.continue_workflow == 'true'
         uses: docker/build-push-action@v7
         with:
@@ -209,19 +219,19 @@ jobs:
           sbom: true
 
   verify-published:
-    name: Verify published image (${{ matrix.platform }})
+    name: Verify published image | ${{ matrix.platform }}
 
     needs:
-      - build
+      - build-and-publish
 
-    if: needs.build.outputs.publish_image == 'true'
+    if: needs.build-and-publish.outputs.publish_image == 'true'
 
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        platform: ${{ fromJSON(needs.build.outputs.platform_matrix) }}
+        platform: ${{ fromJSON(needs.build-and-publish.outputs.platform_matrix) }}
 
     steps:
       - name: Check out repository
@@ -235,7 +245,7 @@ jobs:
       - name: Pull published image
         shell: pwsh
         run: |
-          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}'
+          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build-and-publish.outputs.version }}'
           $platform = '${{ matrix.platform }}'
 
           for ($attempt = 1; $attempt -le 5; $attempt++) {
@@ -256,6 +266,6 @@ jobs:
         shell: pwsh
         run: |
           & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
-              -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}' `
+              -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build-and-publish.outputs.version }}' `
               -Platform '${{ matrix.platform }}' `
               -GitHubOutput

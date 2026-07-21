@@ -56,10 +56,13 @@ else {
 
     $sharedFilesChanged = Test-PathChanged @(
         '.github/actions/*'
-        '.github/workflows/publish-container-image.yml'
-        # Include this file so changes to the "container-images" workflow trigger builds for all(!) images.
-        # Without it, all image builds would be skipped.
-        '.github/workflows/container-images.yml'
+        '.github/workflows/single-container-image.yml'
+        # Include the calling workflows so that changes to them trigger builds for all(!) images.
+        # Without these entries, all image builds would be skipped.
+        # NOTE: This script can be called from a PR (which necessitates "pr.yml") as well as a
+        #   push to the main branch (which necessitates "ci.yml").
+        '.github/workflows/ci.yml'
+        '.github/workflows/pr.yml'
     )
 
     $selectedImages = @()

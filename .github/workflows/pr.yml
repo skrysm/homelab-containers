@@ -1,38 +1,17 @@
-name: Container images
-run-name: "Container images | ${{ github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.pull_request.number, github.event.pull_request.title) || github.event_name == 'schedule' && 'Scheduled' || github.event_name == 'workflow_dispatch' && 'Manual: all' || 'Push' }}"
+name: Pull Requests
+run-name: "PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
 
 on:
   # IMPORTANT: Always run this workflow (i.e. no path filter) so the required gate job is reported
   # even when no container images have changed.
   pull_request:
 
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/actions/**"
-      - ".github/workflows/publish-container-image.yml"
-      - ".github/workflows/container-images.yml"
-      - "container-images/**"
-
-  schedule:
-    # Every day at 00:23 UTC.
-    - cron: "23 0 * * *"
-
-  workflow_dispatch:
-    inputs:
-      treat_as_scheduled_run:
-        description: "Treat as 'scheduled' run (for testing purposes)."
-        type: boolean
-        required: false
-        default: false
-
 permissions:
   contents: read
 
 jobs:
   select-container-images:
-    name: Select container images
+    name: Determine container images to process
     runs-on: ubuntu-latest
     outputs:
       selected_images: ${{ steps.selection.outputs.selected_images }}
@@ -47,12 +26,12 @@ jobs:
         id: selection
         uses: ./.github/actions/select-container-images
         with:
-          base-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || github.sha }}
-          head-sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          selection-mode: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'changed' }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          selection-mode: changed
 
   validate-container-images:
-    name: "${{ github.event_name == 'pull_request' && 'Validate' || 'Publish' }}: ${{ matrix.image }}"
+    name: "Validate: ${{ matrix.image }}"
     needs: select-container-images
     if: needs.select-container-images.outputs.selected_images != '[]'
     permissions:
@@ -62,10 +41,10 @@ jobs:
       fail-fast: false
       matrix:
         image: ${{ fromJSON(needs.select-container-images.outputs.selected_images) }}
-    uses: ./.github/workflows/publish-container-image.yml
+    uses: ./.github/workflows/single-container-image.yml
     with:
       image-name: ${{ matrix.image }}
-      treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}
+      publish: false
 
   # This job is the required check in the GitHub PR ruleset.
   build-gate:
@@ -76,7 +55,7 @@ jobs:
     # NOTE: This job must always run - even if no container images have been touched. This is important because
     #   this job is the required check for all PRs and PRs that don't touch any container images wouldn't be able
     #   merge without this.
-    if: always() && github.event_name == 'pull_request'
+    if: always()
     runs-on: ubuntu-slim
 
     steps:
