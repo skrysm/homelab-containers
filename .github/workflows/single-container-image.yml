@@ -219,7 +219,7 @@ jobs:
           sbom: true
 
   verify-published:
-    name: Verify published container image (${{ matrix.platform }})
+    name: Verify published image | ${{ matrix.platform }}
 
     needs:
       - build-and-publish
