@@ -49,8 +49,8 @@ env:
   FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/${{ inputs.image-name }}
 
 jobs:
-  build:
-    name: Build container image
+  build-and-publish:
+    name: "${{ inputs.publish && 'Publish' || 'Build' }} container image"
     runs-on: ubuntu-latest
     outputs:
       platform_matrix: ${{ steps.configuration.outputs.platform_matrix }}
@@ -222,16 +222,16 @@ jobs:
     name: Verify published container image (${{ matrix.platform }})
 
     needs:
-      - build
+      - build-and-publish
 
-    if: needs.build.outputs.publish_image == 'true'
+    if: needs.build-and-publish.outputs.publish_image == 'true'
 
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        platform: ${{ fromJSON(needs.build.outputs.platform_matrix) }}
+        platform: ${{ fromJSON(needs.build-and-publish.outputs.platform_matrix) }}
 
     steps:
       - name: Check out repository
@@ -245,7 +245,7 @@ jobs:
       - name: Pull published image
         shell: pwsh
         run: |
-          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}'
+          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build-and-publish.outputs.version }}'
           $platform = '${{ matrix.platform }}'
 
           for ($attempt = 1; $attempt -le 5; $attempt++) {
@@ -266,6 +266,6 @@ jobs:
         shell: pwsh
         run: |
           & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
-              -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build.outputs.version }}' `
+              -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build-and-publish.outputs.version }}' `
               -Platform '${{ matrix.platform }}' `
               -GitHubOutput
