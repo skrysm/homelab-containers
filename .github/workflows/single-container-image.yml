@@ -1,5 +1,5 @@
-name: Publish container image
-run-name: "Publish container image | ${{ inputs.image-name }}"
+name: Single container image
+run-name: "Single container image | ${{ inputs.image-name }}"
 
 on:
   workflow_call:

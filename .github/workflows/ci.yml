@@ -9,7 +9,7 @@ on:
       - ".github/actions/**"
       - ".github/workflows/ci.yml"
       - ".github/workflows/pr.yml"
-      - ".github/workflows/publish-container-image.yml"
+      - ".github/workflows/single-container-image.yml"
       - "container-images/**"
 
   schedule:
@@ -59,7 +59,7 @@ jobs:
       fail-fast: false
       matrix:
         image: ${{ fromJSON(needs.select-container-images.outputs.selected_images) }}
-    uses: ./.github/workflows/publish-container-image.yml
+    uses: ./.github/workflows/single-container-image.yml
     with:
       image-name: ${{ matrix.image }}
       treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}

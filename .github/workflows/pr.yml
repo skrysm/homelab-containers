@@ -41,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         image: ${{ fromJSON(needs.select-container-images.outputs.selected_images) }}
-    uses: ./.github/workflows/publish-container-image.yml
+    uses: ./.github/workflows/single-container-image.yml
     with:
       image-name: ${{ matrix.image }}
 
