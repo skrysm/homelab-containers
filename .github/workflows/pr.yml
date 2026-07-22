@@ -6,6 +6,13 @@ on:
   # even when no container images have changed.
   pull_request:
 
+# This concurrency group is primarily for making sure that GHA cache always gets
+# the latest build (i.e. by cancelling a running workflow run if a new commit is
+# pushed to the PR).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -45,6 +52,7 @@ jobs:
     with:
       image-name: ${{ matrix.image }}
       publish: false
+      use-build-cache: true
 
   # This job is the(!) required check in the GitHub PR ruleset.
   build-gate:
