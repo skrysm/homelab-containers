@@ -46,9 +46,9 @@ jobs:
       image-name: ${{ matrix.image }}
       publish: false
 
-  # This job is the required check in the GitHub PR ruleset.
+  # This job is the(!) required check in the GitHub PR ruleset.
   build-gate:
-    name: Build gate
+    name: PR Build Gate
     needs:
       - select-container-images
       - validate-container-images
