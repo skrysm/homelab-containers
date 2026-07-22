@@ -13,6 +13,11 @@ on:
         description: Publish the successfully validated container image.
         type: boolean
         required: true
+      use-build-cache:
+        description: Use the GitHub Actions cache for Docker builds.
+        type: boolean
+        required: false
+        default: false
       treat_as_scheduled_run:
         description: "Treat as 'scheduled' run (for testing purposes)"
         type: boolean
@@ -99,6 +104,20 @@ jobs:
           # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
           exit 0
 
+      - name: Configure Docker build cache
+        id: build_cache
+        if: inputs.use-build-cache
+        shell: pwsh
+        run: |
+          # Use a fresh cache each day so unpinned package installations inside the container
+          # images are refreshed at least daily.
+          # NOTE: The cache is automatically scoped to a PR, i.e. PR 1 can't read or write
+          #   the cache of PR 2.
+          $cacheScope = '${{ inputs.image-name }}-' + [DateTime]::UtcNow.ToString('yyyy-MM-dd')
+
+          "cache_from=type=gha,scope=$cacheScope" >> $env:GITHUB_OUTPUT
+          "cache_to=type=gha,scope=$cacheScope,mode=max" >> $env:GITHUB_OUTPUT
+
       # It's recommended to run this before "setup-buildx-action".
       # See: https://github.com/docker/setup-qemu-action#usage
       - name: Set up QEMU for Docker
@@ -120,6 +139,7 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: ${{ env.CANDIDATE_IMAGE }}
+          cache-from: ${{ steps.build_cache.outputs.cache_from }}
 
       - name: Test candidate container image
         shell: pwsh
@@ -194,6 +214,8 @@ jobs:
           context: ./${{ env.BUILD_CONTEXT }}
           platforms: ${{ steps.configuration.outputs.platforms }}
           push: ${{ steps.publish_decision.outputs.publish_image == 'true' }}
+          cache-from: ${{ steps.build_cache.outputs.cache_from }}
+          cache-to: ${{ steps.build_cache.outputs.cache_to }}
           tags: |
             ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest

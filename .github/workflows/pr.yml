@@ -45,6 +45,7 @@ jobs:
     with:
       image-name: ${{ matrix.image }}
       publish: false
+      use-build-cache: true
 
   # This job is the(!) required check in the GitHub PR ruleset.
   build-gate:
