@@ -11,7 +11,7 @@ param (
     [string] $PublishedImage
 )
 
-$versionScript = Join-Path $BuildContext 'Get-ContainerImageVersion.ps1'
+$versionScript = "$BuildContext/Get-ContainerImageVersion.ps1"
 
 if (-not (Test-Path -LiteralPath $versionScript -PathType Leaf)) {
     throw "Version script '$versionScript' was not found."
@@ -36,17 +36,7 @@ $detailLines = @(
     "**Published version:** ``$publishedVersion``"
 )
 
-if ($candidateVersion -eq $publishedVersion) {
-    $changed = $false
-    $outcomeMessage = "The image version is unchanged compared to '$PublishedImage'."
-}
-else {
-    $changed = $true
-    $outcomeMessage = "The image version changed from '$publishedVersion' to '$candidateVersion'."
-}
-
 return @{
-    Changed        = $changed
-    OutcomeMessage = $outcomeMessage
-    DetailLines    = $detailLines
+    Changed     = $candidateVersion -ne $publishedVersion
+    DetailLines = $detailLines
 }

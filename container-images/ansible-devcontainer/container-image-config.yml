@@ -1,4 +1,5 @@
 docker_platforms:
   - linux/amd64
   - linux/arm64
-comparison_method: version
+comparison_method: package-manifest
+package_manifests: os, python

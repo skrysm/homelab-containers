@@ -7,6 +7,8 @@ param (
     [Parameter(Mandatory = $true)]
     [string] $ComparisonMethod,
 
+    [string] $PackageManifests = '',
+
     [Parameter(Mandatory = $true)]
     [string] $CandidateImage,
 
@@ -31,17 +33,29 @@ $publishedImageExists = $LASTEXITCODE -eq 0
 
 if (-not $publishedImageExists) {
     $comparisonResult = @{
-        Changed        = $true
-        OutcomeMessage = "Published image '$PublishedImage' doesn't exist."
-        DetailLines    = @()
+        Changed     = $true
+        DetailLines = @("Published image '$PublishedImage' doesn't exist.")
     }
 }
 else {
     $comparisonResult = switch ($ComparisonMethod) {
         'package-manifest' {
-            & "$PSScriptRoot/comparison-methods/Invoke-AlpinePackageManifestComparison.ps1" `
+            # Default package manifest types to "os" if none are specified - as this should be the
+            # sensible default for most containers.
+            if (-not $PackageManifests) {
+                $PackageManifests = 'os'
+            }
+
+            $comparison = & "$PSScriptRoot/comparison-methods/Compare-PackageManifests.ps1" `
                 -CandidateImage $CandidateImage `
-                -PublishedImage $PublishedImage
+                -PublishedImage $PublishedImage `
+                -ManifestTypes $PackageManifests `
+                -PassThru
+
+            @{
+                Changed     = $comparison.PackageManifestChanged
+                DetailLines = @($comparison.MarkdownLines)
+            }
         }
         'version' {
             & "$PSScriptRoot/comparison-methods/Invoke-ImageVersionComparison.ps1" `
@@ -78,12 +92,9 @@ $summaryLines = @(
 $detailLines = @($comparisonResult.DetailLines)
 if ($detailLines.Count -gt 0) {
     $summaryLines += $detailLines
-    $summaryLines += ''
 }
 
-$summaryLines += $comparisonResult.OutcomeMessage
-
-Write-Host "Container image comparison result: $($comparisonResult.OutcomeMessage)"
+Write-Host "Container image comparison result: $comparisonStatus"
 
 "changes_detected=$($comparisonResult.Changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 $summaryLines >> $env:GITHUB_STEP_SUMMARY
