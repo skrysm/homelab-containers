@@ -18,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 $IMAGES_BASE_PATH = 'container-images'
 
 $imageNames = @()
+$containerImageFilesChanged = $false
 
 foreach ($directory in (Get-ChildItem -Path $IMAGES_BASE_PATH -Directory)) {
     $configurationPath = Join-Path $directory.FullName 'container-image-config.yml'
@@ -54,6 +55,8 @@ else {
         return $false
     }
 
+    $containerImageFilesChanged = Test-PathChanged "$IMAGES_BASE_PATH/*"
+
     $sharedFilesChanged = Test-PathChanged @(
         '.github/actions/*'
         '.github/workflows/single-container-image.yml'
@@ -80,6 +83,7 @@ else {
 
 $selectedImagesJson = ConvertTo-Json -InputObject $selectedImages -Compress
 "selected_images=$selectedImagesJson" >> $env:GITHUB_OUTPUT
+"container_image_files_changed=$($containerImageFilesChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
 # Only add a summary to this action if no container images were selected.
 # Selected images each add their own summary to the workflow run.

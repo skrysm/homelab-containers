@@ -18,6 +18,9 @@ outputs:
   selected_images:
     description: A JSON array containing the names of the selected container images.
     value: ${{ steps.selection.outputs.selected_images }}
+  container_image_files_changed:
+    description: Whether any files below the container-images directory changed.
+    value: ${{ steps.selection.outputs.container_image_files_changed }}
 
 runs:
   using: composite

@@ -38,6 +38,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       selected_images: ${{ steps.selection.outputs.selected_images }}
+      # For "push" runs, enable publishing only if container image files have changed. In particular, do not publish
+      # if only .github files have changed. Some corner cases may still require publishing; in those cases, a
+      # maintainer can manually trigger this workflow with publishing enabled.
+      publish_images: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) || (github.event_name == 'push' && steps.selection.outputs.container_image_files_changed == 'true') }}
 
     steps:
       - name: Check out repository
@@ -54,7 +58,7 @@ jobs:
           selection-mode: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'changed' }}
 
   publish-container-images:
-    name: "${{ (github.event_name != 'workflow_dispatch' || inputs.publish) && 'Publish' || 'Validate' }}: ${{ matrix.image }}"
+    name: "${{ needs.select-container-images.outputs.publish_images == 'true' && 'Publish' || 'Validate' }}: ${{ matrix.image }}"
     needs: select-container-images
     if: needs.select-container-images.outputs.selected_images != '[]'
     permissions:
@@ -67,5 +71,5 @@ jobs:
     uses: ./.github/workflows/single-container-image.yml
     with:
       image-name: ${{ matrix.image }}
-      publish: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+      publish: ${{ needs.select-container-images.outputs.publish_images == 'true' }}
       treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}
