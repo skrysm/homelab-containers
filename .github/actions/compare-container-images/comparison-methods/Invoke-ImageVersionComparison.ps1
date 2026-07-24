@@ -11,7 +11,7 @@ param (
     [string] $PublishedImage
 )
 
-$versionScript = Join-Path $BuildContext 'Get-ContainerImageVersion.ps1'
+$versionScript = "$BuildContext/Get-ContainerImageVersion.ps1"
 
 if (-not (Test-Path -LiteralPath $versionScript -PathType Leaf)) {
     throw "Version script '$versionScript' was not found."
