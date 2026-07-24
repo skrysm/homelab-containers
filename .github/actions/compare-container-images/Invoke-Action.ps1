@@ -84,7 +84,7 @@ else {
 }
 
 $summaryLines = @(
-    "## $comparisonTitle comparison | ``$ImageName``"
+    "## $comparisonTitle comparison | $ImageName"
     ''
     "**Result:** $comparisonStatus"
     ''

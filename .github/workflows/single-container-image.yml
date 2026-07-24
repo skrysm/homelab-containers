@@ -157,7 +157,7 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
           @(
-              "## Container image version | ``${{ inputs.image-name }}``"
+              "## Container image version | ${{ inputs.image-name }}"
               ""
               "The primary software version detected inside the candidate image is used as the container image tag."
               ""
