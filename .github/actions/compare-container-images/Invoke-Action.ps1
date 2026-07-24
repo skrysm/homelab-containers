@@ -5,6 +5,9 @@ param (
     [string] $BuildContext,
 
     [Parameter(Mandatory = $true)]
+    [string] $ImageName,
+
+    [Parameter(Mandatory = $true)]
     [string] $ComparisonMethod,
 
     [string] $PackageManifests = '',
@@ -81,7 +84,7 @@ else {
 }
 
 $summaryLines = @(
-    "## $comparisonTitle comparison"
+    "## $comparisonTitle comparison | ``$ImageName``"
     ''
     "**Result:** $comparisonStatus"
     ''

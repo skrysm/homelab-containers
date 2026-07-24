@@ -157,11 +157,9 @@ jobs:
           "version=$version" >> $env:GITHUB_OUTPUT
 
           @(
-              "## Container image version"
+              "## Container image version | ``${{ inputs.image-name }}``"
               ""
               "The primary software version detected inside the candidate image is used as the container image tag."
-              ""
-              "**Image:** ``${{ inputs.image-name }}``"
               ""
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
@@ -171,6 +169,7 @@ jobs:
         uses: ./.github/actions/compare-container-images
         with:
           build-context: ./${{ env.BUILD_CONTEXT }}
+          image-name: ${{ inputs.image-name }}
           comparison-method: ${{ steps.configuration.outputs.comparison_method }}
           package-manifests: ${{ steps.configuration.outputs.package_manifests }}
           candidate-image: ${{ env.CANDIDATE_IMAGE }}

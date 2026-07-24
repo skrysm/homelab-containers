@@ -5,6 +5,9 @@ inputs:
   build-context:
     description: Build context directory associated with the container images.
     required: true
+  image-name:
+    description: Name of the container image being compared.
+    required: true
   comparison-method:
     description: Comparison method to use. Supported values are "package-manifest" and "version".
     required: true
@@ -40,6 +43,7 @@ runs:
       run: |
         & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
             -BuildContext '${{ inputs.build-context }}' `
+            -ImageName '${{ inputs.image-name }}' `
             -ComparisonMethod '${{ inputs.comparison-method }}' `
             -PackageManifests '${{ inputs.package-manifests }}' `
             -CandidateImage '${{ inputs.candidate-image }}' `
