@@ -8,6 +8,17 @@ inputs:
   comparison-method:
     description: Comparison method to use. Supported values are "package-manifest" and "version".
     required: true
+  package-manifests:
+    description: >
+      Comma-separated package manifest types to compare. Defaults to "os" if not specified and if
+      comparison-method is "package-manifest". Supported values are the directory names under
+      "comparison-methods/package-manifests".
+    required: false
+    # NOTE: We don't set the default to "os" here because this input is always set by the caller.
+    #   If no package-manifest type is not specified, the caller will pass an empty string for
+    #   this input. Thus, any default we set here would always be ignored. Instead, the default
+    #   is implemented in Invoke-Action.ps1.
+    default: ''
   candidate-image:
     description: Candidate container image to compare.
     required: true
@@ -30,5 +41,6 @@ runs:
         & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
             -BuildContext '${{ inputs.build-context }}' `
             -ComparisonMethod '${{ inputs.comparison-method }}' `
+            -PackageManifests '${{ inputs.package-manifests }}' `
             -CandidateImage '${{ inputs.candidate-image }}' `
             -PublishedImage '${{ inputs.published-image }}'

@@ -96,10 +96,12 @@ jobs:
           }
 
           $comparisonMethod = ([string] $configuration.comparison_method).Trim()
+          $packageManifests = ([string] $configuration.package_manifests).Trim()
 
           "platforms=$($platforms -join ',')" >> $env:GITHUB_OUTPUT
           "platform_matrix=$(ConvertTo-Json -InputObject @($platforms) -Compress)" >> $env:GITHUB_OUTPUT
           "comparison_method=$comparisonMethod" >> $env:GITHUB_OUTPUT
+          "package_manifests=$packageManifests" >> $env:GITHUB_OUTPUT
 
           # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
           exit 0
@@ -170,6 +172,7 @@ jobs:
         with:
           build-context: ./${{ env.BUILD_CONTEXT }}
           comparison-method: ${{ steps.configuration.outputs.comparison_method }}
+          package-manifests: ${{ steps.configuration.outputs.package_manifests }}
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 

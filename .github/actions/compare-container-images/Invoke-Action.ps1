@@ -7,6 +7,8 @@ param (
     [Parameter(Mandatory = $true)]
     [string] $ComparisonMethod,
 
+    [string] $PackageManifests = '',
+
     [Parameter(Mandatory = $true)]
     [string] $CandidateImage,
 
@@ -39,9 +41,31 @@ if (-not $publishedImageExists) {
 else {
     $comparisonResult = switch ($ComparisonMethod) {
         'package-manifest' {
-            & "$PSScriptRoot/comparison-methods/Invoke-AlpinePackageManifestComparison.ps1" `
+            # Default package manifest types to "os" if none are specified - as this should be the
+            # sensible default for most containers.
+            if (-not $PackageManifests) {
+                $PackageManifests = 'os'
+            }
+
+            $comparison = & "$PSScriptRoot/comparison-methods/Compare-PackageManifests.ps1" `
                 -CandidateImage $CandidateImage `
-                -PublishedImage $PublishedImage
+                -PublishedImage $PublishedImage `
+                -ManifestTypes $PackageManifests `
+                -PassThru
+
+            $changed = $comparison.PackageManifestChanged
+            $outcomeMessage = if ($changed) {
+                "At least one package version changed between the candidate image and '$PublishedImage'."
+            }
+            else {
+                "No package version changes between the candidate image and '$PublishedImage'."
+            }
+
+            @{
+                Changed        = $changed
+                OutcomeMessage = $outcomeMessage
+                DetailLines    = @($comparison.MarkdownLines)
+            }
         }
         'version' {
             & "$PSScriptRoot/comparison-methods/Invoke-ImageVersionComparison.ps1" `
