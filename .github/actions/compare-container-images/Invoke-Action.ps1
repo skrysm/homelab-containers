@@ -33,9 +33,8 @@ $publishedImageExists = $LASTEXITCODE -eq 0
 
 if (-not $publishedImageExists) {
     $comparisonResult = @{
-        Changed        = $true
-        OutcomeMessage = "Published image '$PublishedImage' doesn't exist."
-        DetailLines    = @()
+        Changed     = $true
+        DetailLines = @("Published image '$PublishedImage' doesn't exist.")
     }
 }
 else {
@@ -53,18 +52,9 @@ else {
                 -ManifestTypes $PackageManifests `
                 -PassThru
 
-            $changed = $comparison.PackageManifestChanged
-            $outcomeMessage = if ($changed) {
-                "At least one package version changed between the candidate image and '$PublishedImage'."
-            }
-            else {
-                "No package version changes between the candidate image and '$PublishedImage'."
-            }
-
             @{
-                Changed        = $changed
-                OutcomeMessage = $outcomeMessage
-                DetailLines    = @($comparison.MarkdownLines)
+                Changed     = $comparison.PackageManifestChanged
+                DetailLines = @($comparison.MarkdownLines)
             }
         }
         'version' {
@@ -102,12 +92,9 @@ $summaryLines = @(
 $detailLines = @($comparisonResult.DetailLines)
 if ($detailLines.Count -gt 0) {
     $summaryLines += $detailLines
-    $summaryLines += ''
 }
 
-$summaryLines += $comparisonResult.OutcomeMessage
-
-Write-Host "Container image comparison result: $($comparisonResult.OutcomeMessage)"
+Write-Host "Container image comparison result: $comparisonStatus"
 
 "changes_detected=$($comparisonResult.Changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 $summaryLines >> $env:GITHUB_STEP_SUMMARY
