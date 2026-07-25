@@ -152,7 +152,26 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = & './${{ env.BUILD_CONTEXT }}/Get-ContainerImageVersion.ps1' -Image '${{ env.CANDIDATE_IMAGE }}'
+          $versionOutput = @(& './${{ env.BUILD_CONTEXT }}/Get-ContainerImageVersion.ps1' -Image '${{ env.CANDIDATE_IMAGE }}')
+
+          if ($versionOutput.Count -ne 1) {
+              throw "Expected exactly one container image version, but received $($versionOutput.Count)."
+          }
+
+          $detectedVersion = [string] $versionOutput[0]
+          if ($detectedVersion -notmatch '^[0-9]+\.[0-9]+(?:\.[0-9]+)?$') {
+              throw "Invalid container image version '$detectedVersion'. Expected 'x.y' or 'x.y.z', with numeric components."
+          }
+
+          # Renovate and Dependabot treat an x.y Docker tag as a rolling minor-version tag and preserve
+          # its precision - meaning they won't update a "1.2" tag to "1.2.1". However, they will update
+          # a "1.2.0" tag to "1.2.1". That's why we normalize "x.y" to "x.y.0".
+          $version = if ($detectedVersion -match '^[0-9]+\.[0-9]+$') {
+              "$detectedVersion.0"
+          }
+          else {
+              $detectedVersion
+          }
 
           "version=$version" >> $env:GITHUB_OUTPUT
 
