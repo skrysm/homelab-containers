@@ -166,6 +166,11 @@ jobs:
           tags: ${{ env.CANDIDATE_IMAGE }}
           cache-from: ${{ steps.build_cache.outputs.cache_from }}
 
+      # NOTE: Since non-native platform builds (e.g. ARM) can take a long to, if there is anything wrong with
+      #   the current version, lets fail early here (i.e. don't attempt to build the expensive multi-platform
+      #   image in this case).
+      # NOTE 2: While we could move this step after the decision whether to continue (in scheduled runs), the
+      #   tests are often very cheap and moving this step would break up the logical sections in this workflow.
       - name: Test candidate container image
         shell: pwsh
         run: |
