@@ -32,6 +32,7 @@ on:
         required: true
         options:
           - ansible-devcontainer
+          - test-image
           - unbound
       publish:
         description: Publish the successfully validated container image.
