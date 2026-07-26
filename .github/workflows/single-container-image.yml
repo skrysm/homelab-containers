@@ -32,6 +32,7 @@ on:
         required: true
         options:
           - ansible-devcontainer
+          - test-image
           - unbound
       publish:
         description: Publish the successfully validated container image.
@@ -58,11 +59,18 @@ jobs:
     name: "${{ inputs.publish && 'Publish container image' || 'Build container image (no publish)' }}"
     runs-on: ubuntu-latest
     outputs:
-      platform_matrix: ${{ steps.configuration.outputs.platform_matrix }}
+      platforms: ${{ steps.configuration.outputs.platforms }}
       publish_image: ${{ steps.publish_decision.outputs.publish_image }}
+      published_digest: ${{ steps.publish_image.outputs.digest }}
       version: ${{ steps.version.outputs.version }}
 
     steps:
+      # ---------------------------------------------------------------------------
+      #
+      # Prepare build environment
+      #
+      # ---------------------------------------------------------------------------
+
       - name: Check out repository
         uses: actions/checkout@v7
 
@@ -99,7 +107,6 @@ jobs:
           $packageManifests = ([string] $configuration.package_manifests).Trim()
 
           "platforms=$($platforms -join ',')" >> $env:GITHUB_OUTPUT
-          "platform_matrix=$(ConvertTo-Json -InputObject @($platforms) -Compress)" >> $env:GITHUB_OUTPUT
           "comparison_method=$comparisonMethod" >> $env:GITHUB_OUTPUT
           "package_manifests=$packageManifests" >> $env:GITHUB_OUTPUT
 
@@ -120,6 +127,22 @@ jobs:
           "cache_from=type=gha,scope=$cacheScope" >> $env:GITHUB_OUTPUT
           "cache_to=type=gha,scope=$cacheScope,mode=max" >> $env:GITHUB_OUTPUT
 
+      # Enable Docker's containerd image store because the runner's default image store cannot load
+      # multi-platform images. This lets us load the complete image locally and, with QEMU, test every
+      # platform before publishing.
+      #
+      # Without this, "docker/build-push-action" with more than one platform would fail with:
+      # ERROR: failed to build: docker exporter does not currently support exporting manifest lists
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v5
+        with:
+          daemon-config: |
+            {
+              "features": {
+                "containerd-snapshotter": true
+              }
+            }
+
       # It's recommended to run this before "setup-buildx-action".
       # See: https://github.com/docker/setup-qemu-action#usage
       - name: Set up QEMU for Docker
@@ -130,6 +153,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # ---------------------------------------------------------------------------
+      #
+      # Build and validate candidate image
+      #
+      # ---------------------------------------------------------------------------
+
       - name: Build candidate container image
         uses: docker/build-push-action@v7
         env:
@@ -139,10 +168,15 @@ jobs:
         with:
           context: ./${{ env.BUILD_CONTEXT }}
           platforms: linux/amd64
-          load: true
+          load: true # make build result available to the "docker" command
           tags: ${{ env.CANDIDATE_IMAGE }}
           cache-from: ${{ steps.build_cache.outputs.cache_from }}
 
+      # NOTE: Since non-native platform builds (e.g. ARM) can take a long to, if there is anything wrong with
+      #   the current version, lets fail early here (i.e. don't attempt to build the expensive multi-platform
+      #   image in this case).
+      # NOTE 2: While we could move this step after the decision whether to continue (in scheduled runs), the
+      #   tests are often very cheap and moving this step would break up the logical sections in this workflow.
       - name: Test candidate container image
         shell: pwsh
         run: |
@@ -183,6 +217,12 @@ jobs:
               "**Detected version:** ``$version``"
           ) >> $env:GITHUB_STEP_SUMMARY
 
+      # ---------------------------------------------------------------------------
+      #
+      # Compare and decide whether to publish
+      #
+      # ---------------------------------------------------------------------------
+
       - name: Compare candidate container image to latest published
         id: container_image_comparison
         uses: ./.github/actions/compare-container-images
@@ -217,8 +257,60 @@ jobs:
           "continue_workflow=$($continueWorkflow.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "publish_image=$($publishImage.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
+      # ---------------------------------------------------------------------------
+      #
+      # Build and validate final multi-platform image
+      #
+      # ---------------------------------------------------------------------------
+
+      # NOTE: We still do this step on PRs - even though we don't push the image - to detect any problems
+      #   inside this workflow before the PR is merged to the main branch.
+      - name: Build multi-platform image
+        if: steps.publish_decision.outputs.continue_workflow == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: ./${{ env.BUILD_CONTEXT }}
+          platforms: ${{ steps.configuration.outputs.platforms }}
+          load: true # make build result available to the "docker" command
+          cache-from: ${{ steps.build_cache.outputs.cache_from }}
+          cache-to: ${{ steps.build_cache.outputs.cache_to }}
+          tags: |
+            ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.FINAL_IMAGE_NAME }}:latest
+
+      - name: Test non-native platforms
+        if: steps.publish_decision.outputs.continue_workflow == 'true'
+        shell: pwsh
+        run: |
+          $CANDIDATE_PLATFORM = 'linux/amd64'
+          $platforms = ('${{ steps.configuration.outputs.platforms }}' -split ',').Trim()
+
+          foreach ($platform in $platforms) {
+              if ($platform -eq $CANDIDATE_PLATFORM) {
+                  # Skip the candidate/native platform as this has been tested above already.
+                  continue
+              }
+
+              Write-Host "::group::Test container image | $platform"
+              try {
+                  & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
+                      -Image '${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}' `
+                      -Platform $platform `
+                      -GitHubOutput
+              }
+              finally {
+                  Write-Host '::endgroup::'
+              }
+          }
+
+      # ---------------------------------------------------------------------------
+      #
+      # Publish multi-platform image
+      #
+      # ---------------------------------------------------------------------------
+
+      # Logging in only after validation makes accidental publication by an earlier step impossible.
       - name: Log in to GitHub Container Registry
-        # NOTE: We skip this step here to make sure that these runs cannot push the container image by accident.
         if: steps.publish_decision.outputs.publish_image == 'true'
         uses: docker/login-action@v4
         with:
@@ -226,29 +318,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # NOTE: We still do this step on PRs - even though we don't push the image - to detect any problems
-      #   inside this workflow before the PR is merged to the main branch.
-      - name: ${{ steps.publish_decision.outputs.publish_image == 'true' && 'Publish multi-platform image' || 'Build multi-platform image (no publish)' }}
-        if: steps.publish_decision.outputs.continue_workflow == 'true'
+      - name: Publish multi-platform image
+        id: publish_image
+        if: steps.publish_decision.outputs.publish_image == 'true'
+        # BuildKit reuses the result of the local build above. A separate image export is required
+        # because Docker's local "load" exporter does not preserve provenance or SBOM attestations.
         uses: docker/build-push-action@v7
+        env:
+          # See: https://github.com/docker/build-push-action/tree/v7/#environment-variables
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: ./${{ env.BUILD_CONTEXT }}
           platforms: ${{ steps.configuration.outputs.platforms }}
-          push: ${{ steps.publish_decision.outputs.publish_image == 'true' }}
+          push: true
           cache-from: ${{ steps.build_cache.outputs.cache_from }}
-          cache-to: ${{ steps.build_cache.outputs.cache_to }}
           tags: |
             ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
-          # NOTE: Labels can be inspected via:
-          #
-          #   docker image inspect <image-name>:latest --format '{{ json .Config.Labels }}' | jq
-          #
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
             build.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            build.branch=${{ github.head_ref || github.ref_name }}
             build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/${{ env.BUILD_CONTEXT }}/Dockerfile
           # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
           # published image:
@@ -261,8 +354,9 @@ jobs:
           provenance: true
           sbom: true
 
+  # NOTE: This runs a separate job to avoid the risk that any on-disk cache still/already contains the published image.
   verify-published:
-    name: Verify published image | ${{ matrix.platform }}
+    name: Verify published image
 
     needs:
       - build-and-publish
@@ -270,45 +364,30 @@ jobs:
     if: needs.build-and-publish.outputs.publish_image == 'true'
 
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: ${{ fromJSON(needs.build-and-publish.outputs.platform_matrix) }}
+    permissions:
+      contents: read
+      packages: read
 
     steps:
+      # Required for the custom action below
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up QEMU
-        uses: ./.github/actions/setup-qemu-for-docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Only required if the repo is private.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
         with:
-          platforms: ${{ matrix.platform }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull published image
-        shell: pwsh
-        run: |
-          $image = '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build-and-publish.outputs.version }}'
-          $platform = '${{ matrix.platform }}'
-
-          for ($attempt = 1; $attempt -le 5; $attempt++) {
-              docker pull --platform $platform $image
-              if ($LASTEXITCODE -eq 0) {
-                  exit 0
-              }
-
-              if ($attempt -lt 5) {
-                  Write-Host "Pull failed. Retrying in 10 seconds..."
-                  Start-Sleep -Seconds 10
-              }
-          }
-
-          exit $LASTEXITCODE
-
-      - name: Test published image
-        shell: pwsh
-        run: |
-          & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
-              -Image '${{ env.FINAL_IMAGE_NAME }}:${{ needs.build-and-publish.outputs.version }}' `
-              -Platform '${{ matrix.platform }}' `
-              -GitHubOutput
+      - name: Verify published image
+        uses: ./.github/actions/verify-published-container-image
+        with:
+          image: ${{ env.FINAL_IMAGE_NAME }}
+          version: ${{ needs.build-and-publish.outputs.version }}
+          expected-digest: ${{ needs.build-and-publish.outputs.published_digest }}
+          expected-platforms: ${{ needs.build-and-publish.outputs.platforms }}
