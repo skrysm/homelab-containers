@@ -57,6 +57,11 @@ jobs:
   build-and-publish:
     name: "${{ inputs.publish && 'Publish container image' || 'Build container image (no publish)' }}"
     runs-on: ubuntu-latest
+    outputs:
+      platforms: ${{ steps.configuration.outputs.platforms }}
+      publish_image: ${{ steps.publish_decision.outputs.publish_image }}
+      published_digest: ${{ steps.publish_image.outputs.digest }}
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       # ---------------------------------------------------------------------------
@@ -313,6 +318,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish multi-platform image
+        id: publish_image
         if: steps.publish_decision.outputs.publish_image == 'true'
         # BuildKit reuses the result of the local build above. A separate image export is required
         # because Docker's local "load" exporter does not preserve provenance or SBOM attestations.
@@ -345,3 +351,41 @@ jobs:
           # "unknown/unknown" architecture entry; that is fine and can be ignored.
           provenance: true
           sbom: true
+
+  # NOTE: This runs a separate job to avoid the risk that any on-disk cache still/already contains the published image.
+  verify-published:
+    name: Verify published image
+
+    needs:
+      - build-and-publish
+
+    if: needs.build-and-publish.outputs.publish_image == 'true'
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      # Required for the custom action below
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Only required if the repo is private.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify published image
+        uses: ./.github/actions/verify-published-container-image
+        with:
+          image: ${{ env.FINAL_IMAGE_NAME }}
+          version: ${{ needs.build-and-publish.outputs.version }}
+          expected-digest: ${{ needs.build-and-publish.outputs.published_digest }}
+          expected-platforms: ${{ needs.build-and-publish.outputs.platforms }}

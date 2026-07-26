@@ -1,0 +1,28 @@
+name: Verify published container image
+description: Verify the tags, digest, and platforms of a published container image.
+
+inputs:
+  image:
+    description: Fully qualified container image name without a tag.
+    required: true
+  version:
+    description: Published container image version tag.
+    required: true
+  expected-digest:
+    description: Expected digest for both the version and latest tags.
+    required: true
+  expected-platforms:
+    description: Comma-separated Docker platforms expected in the published image.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Verify published container image
+      shell: pwsh
+      run: |
+        & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
+            -Image '${{ inputs.image }}' `
+            -Version '${{ inputs.version }}' `
+            -ExpectedDigest '${{ inputs.expected-digest }}' `
+            -ExpectedPlatforms '${{ inputs.expected-platforms }}'
