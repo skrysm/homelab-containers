@@ -272,13 +272,19 @@ jobs:
             ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
 
-      - name: Test multi-platform image
+      - name: Test non-native platforms
         if: steps.publish_decision.outputs.continue_workflow == 'true'
         shell: pwsh
         run: |
+          $CANDIDATE_PLATFORM = 'linux/amd64'
           $platforms = ('${{ steps.configuration.outputs.platforms }}' -split ',').Trim()
 
           foreach ($platform in $platforms) {
+              if ($platform -eq $CANDIDATE_PLATFORM) {
+                  # Skip the candidate/native platform as this has been tested above already.
+                  continue
+              }
+
               & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
                   -Image '${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}' `
                   -Platform $platform `
