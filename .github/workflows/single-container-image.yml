@@ -285,10 +285,16 @@ jobs:
                   continue
               }
 
-              & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
-                  -Image '${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}' `
-                  -Platform $platform `
-                  -GitHubOutput
+              Write-Host "::group::Test container image | $platform"
+              try {
+                  & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
+                      -Image '${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}' `
+                      -Platform $platform `
+                      -GitHubOutput
+              }
+              finally {
+                  Write-Host '::endgroup::'
+              }
           }
 
       # ---------------------------------------------------------------------------
