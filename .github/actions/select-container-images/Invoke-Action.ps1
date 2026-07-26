@@ -94,6 +94,3 @@ if ($selectedImages.Count -eq 0) {
         'No container images require validation.'
     ) >> $env:GITHUB_STEP_SUMMARY
 }
-
-# Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-exit 0

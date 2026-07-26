@@ -101,6 +101,3 @@ Write-Host "Container image comparison result: $comparisonStatus"
 
 "changes_detected=$($comparisonResult.Changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 $summaryLines >> $env:GITHUB_STEP_SUMMARY
-
-# Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-exit 0

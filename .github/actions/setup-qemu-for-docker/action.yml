@@ -9,9 +9,12 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Set up gha-pwsh
+      uses: skrysm/setup-gha-pwsh@v1.0.0
+
     - name: Resolve QEMU platforms
       id: resolve_qemu_platforms
-      shell: pwsh
+      shell: gha-pwsh {0}
       run: |
         function Get-QemuPlatform($DockerPlatform) {
             switch ($DockerPlatform.Trim()) {

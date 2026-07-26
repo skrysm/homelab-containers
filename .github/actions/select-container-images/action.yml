@@ -25,9 +25,12 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Set up gha-pwsh
+      uses: skrysm/setup-gha-pwsh@v1.0.0
+
     - name: Select container images
       id: selection
-      shell: pwsh
+      shell: gha-pwsh {0}
       run: |
         & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
             -BaseSha '${{ inputs.base-sha }}' `

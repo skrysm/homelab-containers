@@ -150,6 +150,3 @@ Assert-ExpectedImagePlatforms `
     -ImageReference $VERSIONED_IMAGE `
     -Manifest $VERSIONED_MANIFEST `
     -ExpectedDockerPlatforms $EXPECTED_DOCKER_PLATFORMS
-
-# Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-exit 0

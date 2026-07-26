@@ -74,9 +74,12 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Set up gha-pwsh
+        uses: skrysm/setup-gha-pwsh@v1.0.0
+
       - name: Load container image configuration
         id: configuration
-        shell: pwsh
+        shell: gha-pwsh {0}
         run: |
           $configurationPath = './${{ env.BUILD_CONTEXT }}/container-image-config.yml'
 
@@ -110,13 +113,10 @@ jobs:
           "comparison_method=$comparisonMethod" >> $env:GITHUB_OUTPUT
           "package_manifests=$packageManifests" >> $env:GITHUB_OUTPUT
 
-          # Required so that this step doesn't fail if $LASTEXITCODE is still non-zero.
-          exit 0
-
       - name: Configure Docker build cache
         id: build_cache
         if: inputs.use-build-cache
-        shell: pwsh
+        shell: gha-pwsh {0}
         run: |
           # Use a fresh cache each day so unpinned package installations inside the container
           # images are refreshed at least daily.
@@ -178,13 +178,13 @@ jobs:
       # NOTE 2: While we could move this step after the decision whether to continue (in scheduled runs), the
       #   tests are often very cheap and moving this step would break up the logical sections in this workflow.
       - name: Test candidate container image
-        shell: pwsh
+        shell: gha-pwsh {0}
         run: |
           & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
 
       - name: Determine new container image tag
         id: version
-        shell: pwsh
+        shell: gha-pwsh {0}
         run: |
           $versionOutput = @(& './${{ env.BUILD_CONTEXT }}/Get-ContainerImageVersion.ps1' -Image '${{ env.CANDIDATE_IMAGE }}')
 
@@ -236,7 +236,7 @@ jobs:
 
       - name: Decide on image publishing
         id: publish_decision
-        shell: pwsh
+        shell: gha-pwsh {0}
         run: |
           $changesDetected = switch ('${{ steps.container_image_comparison.outputs.changes_detected }}') {
               'true' { $true }
@@ -280,7 +280,7 @@ jobs:
 
       - name: Test non-native platforms
         if: steps.publish_decision.outputs.continue_workflow == 'true'
-        shell: pwsh
+        shell: gha-pwsh {0}
         run: |
           $CANDIDATE_PLATFORM = 'linux/amd64'
           $platforms = ('${{ steps.configuration.outputs.platforms }}' -split ',').Trim()

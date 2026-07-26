@@ -67,8 +67,11 @@ jobs:
     runs-on: ubuntu-slim
 
     steps:
+      - name: Set up gha-pwsh
+        uses: skrysm/setup-gha-pwsh@v1.0.0
+
       - name: Verify required image validations succeeded
-        shell: pwsh
+        shell: gha-pwsh {0}
         run: |
           # Required because of "if: always()"
           if ('${{ needs.select-container-images.result }}' -ne 'success') {
