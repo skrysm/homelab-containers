@@ -340,6 +340,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ steps.version.outputs.version }}
             build.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            build.branch=${{ github.head_ref || github.ref_name }}
             build.dockerfile=${{ github.server_url }}/${{ github.repository }}/blob/${{ github.sha }}/${{ env.BUILD_CONTEXT }}/Dockerfile
           # Add metadata (attestations; https://docs.docker.com/build/metadata/attestations/) to the
           # published image:
