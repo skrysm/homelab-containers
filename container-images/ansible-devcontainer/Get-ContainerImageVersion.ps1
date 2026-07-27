@@ -5,9 +5,7 @@
 #
 
 param (
-    [string] $Image = "ansible-devcontainer:local",
-
-    [string] $GitHubOutputName
+    [string] $Image = "ansible-devcontainer:local"
 )
 
 # Stop on every error
@@ -50,18 +48,7 @@ print(importlib.metadata.version("ansible"))
         Write-Error "Failed to detect the ansible package version from image '$Image'."
     }
 
-    if ($GitHubOutputName) {
-        # Store version in $env:GITHUB_OUTPUT
-        if (-not $env:GITHUB_OUTPUT) {
-            Write-Error "GitHub output name '$GitHubOutputName' was specified, but GITHUB_OUTPUT is not set."
-        }
-
-        "$GitHubOutputName=$version" >> $env:GITHUB_OUTPUT
-    }
-    else {
-        # Return version
-        $version
-    }
+    return $version
 
     ########################################################################
 }
