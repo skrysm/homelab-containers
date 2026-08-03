@@ -16,3 +16,6 @@ services:
     # to fix this behavior (since this setting is most likely also going to be present
     # in "production" configurations).
     restart: unless-stopped
+    # Workaround for Docker Compose bug: try to pull locally available non-native images from registry
+    # See: https://github.com/docker/compose/issues/14007
+    pull_policy: never
