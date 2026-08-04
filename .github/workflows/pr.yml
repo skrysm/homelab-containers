@@ -68,7 +68,7 @@ jobs:
 
     steps:
       - name: Set up gha-pwsh
-        uses: skrysm/setup-gha-pwsh@v1.0.0
+        uses: skrysm/setup-gha-pwsh@v1.0.1
 
       - name: Verify required image validations succeeded
         shell: gha-pwsh {0}

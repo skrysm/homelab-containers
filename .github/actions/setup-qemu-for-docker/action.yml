@@ -10,7 +10,7 @@ runs:
   using: composite
   steps:
     - name: Set up gha-pwsh
-      uses: skrysm/setup-gha-pwsh@v1.0.0
+      uses: skrysm/setup-gha-pwsh@v1.0.1
 
     - name: Resolve QEMU platforms
       id: resolve_qemu_platforms
