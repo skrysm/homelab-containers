@@ -7,7 +7,7 @@
 
 ## PowerShell Guidelines
 
-* If a variable is really a constant, use ALL_UPPER_CASE for its name.
+* If a variable is really a constant, use ALL_UPPER_CASE for its name - but only if it's a literal or if it's constructed from other literals. Especially don't treat variables as constants when they're constructed from parameters.
 * For simple PowerShell functions, prefer inline parameter declarations (for example, `function Get-Value($InputValue) { ... }`) over a `param (...)` block. Use a `param (...)` block when advanced parameter features make it necessary.
 * Don't use `[PSCustomObject]` if a regular `@{ ... }` is enough.
 * When iterating items, prefer `foreach` over pipelines - unless the code can be expressed in an easy-to-read way in a single line.

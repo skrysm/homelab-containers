@@ -18,8 +18,11 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Set up gha-pwsh
+      uses: skrysm/setup-gha-pwsh@v1.0.0
+
     - name: Verify published container image
-      shell: pwsh
+      shell: gha-pwsh {0}
       run: |
         & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
             -Image '${{ inputs.image }}' `
