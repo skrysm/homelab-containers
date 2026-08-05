@@ -63,11 +63,17 @@ function Invoke-DockerCompose {
         $composeFile
     ) + $Arguments
 
+    $simpleCommandForLogging = "docker compose $($Arguments -join ' ')"
+    Write-Host -ForegroundColor DarkGray "Executing: $simpleCommandForLogging"
+    Write-Host
+
     & docker @composeArguments
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -ne 0) {
-        throw "docker $($composeArguments -join ' ') failed with exit code $exitCode."
+        Write-Host
+        Write-Host -ForegroundColor Red "Command failed with exit code $exitCode."
+        throw "'$simpleCommandForLogging' failed with exit code $exitCode."
     }
 }
 
