@@ -66,8 +66,8 @@ USER vscode
 RUN git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git /home/vscode/.oh-my-zsh \
     && cp /home/vscode/.oh-my-zsh/templates/zshrc.zsh-template /home/vscode/.zshrc
 
-# Create .ssh directory for (potential) custom ssh config
-RUN mkdir -p /home/vscode/.ssh
+# Use the workspace's SSH directory for custom SSH configuration.
+RUN ln -s /workspace/ssh /home/vscode/.ssh
 
 # Switch from vim to nano as default editor (for example for ansible-vault).
 # This has also the nice side effect that nano has syntax highlighting enabled

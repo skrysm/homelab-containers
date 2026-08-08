@@ -93,7 +93,7 @@ function Assert-DevcontainerFiles {
         -Command @(
             'sh',
             '-lc',
-            'test -d "$HOME/.oh-my-zsh" && test -f "$HOME/.zshrc" && test -d "$HOME/.ssh"'
+            'test -d "$HOME/.oh-my-zsh" && test -f "$HOME/.zshrc" && test "$(readlink "$HOME/.ssh")" = "/workspace/ssh"'
         )
 }
 
