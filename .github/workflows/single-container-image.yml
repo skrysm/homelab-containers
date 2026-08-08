@@ -51,7 +51,7 @@ permissions:
 
 env:
   BUILD_CONTEXT: container-images/${{ inputs.image-name }}
-  CANDIDATE_IMAGE: ${{ inputs.image-name }}:candidate
+  CANDIDATE_IMAGE: ${{ inputs.image-name }}:candidate-runid-${{ github.run_id }}-attempt-${{ github.run_attempt }}
   FINAL_IMAGE_NAME: ghcr.io/${{ github.repository }}/${{ inputs.image-name }}
 
 jobs:
@@ -159,7 +159,7 @@ jobs:
       #
       # ---------------------------------------------------------------------------
 
-      - name: Build candidate container image
+      - name: "Build candidate container image | native platform | ${{ env.CANDIDATE_IMAGE }}"
         uses: docker/build-push-action@v7
         env:
           # See: https://github.com/docker/build-push-action/tree/v7/#environment-variables
@@ -177,12 +177,12 @@ jobs:
       #   image in this case).
       # NOTE 2: While we could move this step after the decision whether to continue (in scheduled runs), the
       #   tests are often very cheap and moving this step would break up the logical sections in this workflow.
-      - name: Test candidate container image
+      - name: "Test candidate container image | native platform | ${{ env.CANDIDATE_IMAGE }}"
         shell: gha-pwsh {0}
         run: |
           & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
 
-      - name: Determine new container image tag
+      - name: Determine new container image tag from candidate image
         id: version
         shell: gha-pwsh {0}
         run: |
@@ -259,13 +259,13 @@ jobs:
 
       # ---------------------------------------------------------------------------
       #
-      # Build and validate final multi-platform image
+      # Build and validate multi-platform candidate image
       #
       # ---------------------------------------------------------------------------
 
       # NOTE: We still do this step on PRs - even though we don't push the image - to detect any problems
       #   inside this workflow before the PR is merged to the main branch.
-      - name: Build multi-platform image
+      - name: "Build candidate container image | multi-platform  | ${{ env.CANDIDATE_IMAGE }}"
         if: steps.publish_decision.outputs.continue_workflow == 'true'
         uses: docker/build-push-action@v7
         with:
@@ -274,11 +274,11 @@ jobs:
           load: true # make build result available to the "docker" command
           cache-from: ${{ steps.build_cache.outputs.cache_from }}
           cache-to: ${{ steps.build_cache.outputs.cache_to }}
-          tags: |
-            ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}
-            ${{ env.FINAL_IMAGE_NAME }}:latest
+          # IMPORTANT: This run-specific candidate tag must never be published! This ensures tests cannot
+          #   accidentally pull a previously published image instead of testing the image created by this workflow.
+          tags: ${{ env.CANDIDATE_IMAGE }}
 
-      - name: Test non-native platforms
+      - name: "Test candidate container image | non-native platforms | ${{ env.CANDIDATE_IMAGE }}"
         if: steps.publish_decision.outputs.continue_workflow == 'true'
         shell: gha-pwsh {0}
         run: |
@@ -295,7 +295,7 @@ jobs:
               Write-Host "::group::Tests for platform $platform"
               try {
                   & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' `
-                      -Image '${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}' `
+                      -Image '${{ env.CANDIDATE_IMAGE }}' `
                       -Platform $platform `
                       -GitHubOutput
               }
@@ -372,7 +372,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish multi-platform image
+      - name: "Publish multi-platform image | ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}"
         id: publish_image
         if: steps.publish_decision.outputs.publish_image == 'true'
         # BuildKit reuses the result of the local build above. A separate image export is required
