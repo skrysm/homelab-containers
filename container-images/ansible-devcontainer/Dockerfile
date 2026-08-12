@@ -16,6 +16,7 @@ ENV LANG=C.UTF-8 \
 #
 # * ansible - Ansible itself including ansible-playbook and ansible-vault
 # * ansible-lint - contains ansible-lint (required for linting playbooks and used by the VSCode Ansible extension)
+# * mitogen - provides optional Ansible strategy plugins for faster remote execution
 # * passlib - required for the password_hash() function for the ansible.builtin.user
 #
 # NOTES:
@@ -30,7 +31,14 @@ ENV LANG=C.UTF-8 \
 RUN pip3 install --no-cache-dir \
     ansible \
     ansible-lint \
-    passlib
+    mitogen \
+    passlib \
+    && ln -s \
+        "$(python3 -c 'import ansible_mitogen, pathlib; print(pathlib.Path(ansible_mitogen.__file__).parent / "plugins/strategy")')" \
+        /usr/local/lib/ansible_mitogen_strategy_plugins
+
+# Make Mitogen's strategies discoverable without enabling one by default.
+ENV ANSIBLE_STRATEGY_PLUGINS=/usr/local/lib/ansible_mitogen_strategy_plugins
 
 # Install additional software
 RUN apt-get update -y && apt-get install -y --no-install-recommends \

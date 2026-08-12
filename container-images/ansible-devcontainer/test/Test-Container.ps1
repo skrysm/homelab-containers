@@ -13,8 +13,9 @@ It checks these cases:
 1. The default user is the non-root vscode user.
 2. Expected command line tools are available.
 3. Passwordless sudo works for the vscode user.
-4. Python can import Ansible-related packages.
+4. Python can import Ansible- and Mitogen-related packages.
 5. Ansible can execute a local ping module invocation.
+6. Ansible can load and execute Mitogen's strategy and action plugins.
 
 .EXAMPLE
 ./Test-Container.ps1 -Image ansible-devcontainer:local
@@ -155,15 +156,17 @@ function Assert-PythonPackagesAreAvailable {
     $pythonScript = @'
 import importlib.metadata
 
-for package_name in ("ansible", "ansible-lint", "passlib"):
+for package_name in ("ansible", "ansible-lint", "mitogen", "passlib"):
     print(f"{package_name}=={importlib.metadata.version(package_name)}")
 
 import ansible
+import ansible_mitogen
+import mitogen
 import passlib.hash
 '@
 
     Invoke-ContainerCommand `
-        -Description "Ansible Python packages are available" `
+        -Description "Ansible and Mitogen Python packages are available" `
         -Command @('python3', '-c', $pythonScript)
 }
 
@@ -179,6 +182,16 @@ function Assert-LocalAnsiblePingWorks {
             'local',
             '--module-name',
             'ansible.builtin.ping'
+        )
+}
+
+function Assert-MitogenIntegrationWorks {
+    Invoke-ContainerCommand `
+        -Description "Mitogen integrates with Ansible" `
+        -Command @(
+            'sh',
+            '-lc',
+            'ANSIBLE_STRATEGY=mitogen_linear ansible localhost --inventory localhost, --connection local --module-name mitogen_get_stack'
         )
 }
 
@@ -198,3 +211,4 @@ Assert-VersionCommandsWork
 Assert-PasswordlessSudoWorks
 Assert-PythonPackagesAreAvailable
 Assert-LocalAnsiblePingWorks
+Assert-MitogenIntegrationWorks
