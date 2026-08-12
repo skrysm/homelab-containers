@@ -41,6 +41,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     sudo \
     zsh \
     nano \
+    wget \
     # required for Ansible to connect to hosts via SSH
     openssh-client \
     # required for Ansible to ask for SSH passwords (i.e. when using "-k")
