@@ -11,11 +11,12 @@ the image works as a basic Ansible devcontainer.
 It checks these cases:
 
 1. The default user is the non-root vscode user.
-2. Expected command line tools are available.
-3. Passwordless sudo works for the vscode user.
-4. Python can import Ansible- and Mitogen-related packages.
-5. Ansible can execute a local ping module invocation.
-6. Ansible can load and execute Mitogen's strategy and action plugins.
+2. The Codex directory exists with the expected permissions and owner.
+3. Expected command line tools are available.
+4. Passwordless sudo works for the vscode user.
+5. Python can import Ansible- and Mitogen-related packages.
+6. Ansible can execute a local ping module invocation.
+7. Ansible can load and execute Mitogen's strategy and action plugins.
 
 .EXAMPLE
 ./Test-Container.ps1 -Image ansible-devcontainer:local
@@ -95,6 +96,16 @@ function Assert-DevcontainerFiles {
             'sh',
             '-lc',
             'test -d "$HOME/.oh-my-zsh" && test -f "$HOME/.zshrc" && test "$(readlink "$HOME/.ssh")" = "/workspace/ssh"'
+        )
+}
+
+function Assert-CodexDirectory {
+    Invoke-ContainerCommand `
+        -Description "Codex directory exists with mode 0700 and is owned by vscode" `
+        -Command @(
+            'sh',
+            '-lc',
+            'test -d /home/vscode/.codex && test "$(stat -c %a /home/vscode/.codex)" = 700 && test "$(stat -c %U /home/vscode/.codex)" = vscode'
         )
 }
 
@@ -205,6 +216,7 @@ else {
 Assert-ContainerStarts
 Assert-DefaultUser
 Assert-DevcontainerFiles
+Assert-CodexDirectory
 Assert-EditorEnvironment
 Assert-ToolsAreAvailable
 Assert-VersionCommandsWork

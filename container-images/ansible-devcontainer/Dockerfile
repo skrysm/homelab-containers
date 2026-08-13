@@ -86,5 +86,11 @@ RUN ln -s /workspace/ssh /home/vscode/.ssh
 #   different (i.e. more unconventional) shortcuts that do not interfere with VSCode.
 ENV EDITOR=nano
 
+# Pre-create auth directory for OpenAI Codex VSCode add-in. This way a named volume
+# can be mounted into this directory - and the directory remains writable to vscode.
+# (Without this, the directory would be owned by root and thus not writable by VSCode.)
+RUN mkdir -p /home/vscode/.codex \
+    && chmod 0700 /home/vscode/.codex
+
 # Just for convenience when running this container directly via "docker run -ti".
 CMD ["/bin/zsh"]
