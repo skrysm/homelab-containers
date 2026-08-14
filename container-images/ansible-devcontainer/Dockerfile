@@ -56,6 +56,12 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     sshpass \
     # required for some dependency of ansible
     libonig-dev \
+    # Utilities useful to AI agents
+    jq \
+    yq \
+    shellcheck \
+    shfmt \
+    # Remove downloaded package list (they can always be re-retrieved via apt update)
     && rm -rf /var/lib/apt/lists/*
 
 # Add non-root "vscode" user required for devcontainers.
