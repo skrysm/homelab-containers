@@ -13,8 +13,8 @@ on:
         description: Publish the successfully validated container image.
         type: boolean
         required: true
-      use-build-cache:
-        description: Use the GitHub Actions cache for Docker builds.
+      use-daily-build-cache:
+        description: Use a daily-scoped GitHub Actions cache for Docker builds.
         type: boolean
         required: false
         default: false
@@ -121,7 +121,7 @@ jobs:
 
       - name: Configure Docker build cache
         id: build_cache
-        if: inputs.use-build-cache
+        if: inputs.use-daily-build-cache
         shell: gha-pwsh {0}
         run: |
           # Use a fresh cache each day so unpinned package installations inside the container
