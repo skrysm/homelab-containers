@@ -8,11 +8,12 @@ Runs a minimal end-to-end test against the Unbound container image.
 The test starts the container with Docker Compose and verifies DNS lookups
 through the running Unbound service.
 
-It checks three cases:
+It checks the following cases:
 
-1. A custom local A record from the mounted test config resolves over UDP.
-2. The same custom local A record resolves over TCP.
-3. A real-world DNS name resolves through Unbound.
+- The Unbound process does not run as root.
+- A custom local A record from the mounted test config resolves over UDP.
+- The same custom local A record resolves over TCP.
+- A real-world DNS name resolves through Unbound.
 
 .EXAMPLE
 ./Test-Container.ps1 -Image homelab-unbound:local
@@ -240,6 +241,27 @@ function Assert-ContainerBecomesHealthy([int] $TimeoutSeconds) {
     Write-Error "Unbound container did not become healthy within $TimeoutSeconds seconds. Last health status: $lastHealthStatus"
 }
 
+function Assert-UnboundDoesNotRunAsRoot {
+    $containerId = Get-UnboundContainerId
+
+    $processStatus = docker exec $containerId cat /proc/1/status
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Could not read the status of the Unbound process in container '$containerId'."
+    }
+
+    $uidLine = $processStatus | Where-Object { $_ -like 'Uid:*' } | Select-Object -First 1
+    if (-not $uidLine -or $uidLine -notmatch '^Uid:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)') {
+        Write-Error "Could not determine the user IDs of the Unbound process from /proc/1/status."
+    }
+
+    $effectiveUserId = [int] $Matches[2]
+    if ($effectiveUserId -eq 0) {
+        Write-Error "Expected Unbound not to run as root, but its effective user ID is 0."
+    }
+
+    Write-Host "Verified Unbound does not run as root (effective user ID: $effectiveUserId)."
+}
+
 function Assert-NsLookupIsAvailable {
     if (-not (Get-Command nslookup -ErrorAction SilentlyContinue)) {
         Write-Error "The 'nslookup' command is required to run this test."
@@ -295,6 +317,8 @@ try {
 
     Write-Host
     Write-Title "Running verification tests"
+
+    Assert-UnboundDoesNotRunAsRoot
 
     $customAddressesUdp = Invoke-DnsLookup -Name $CUSTOM_NAME
     Assert-ResolvedAddress -Addresses $customAddressesUdp -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
