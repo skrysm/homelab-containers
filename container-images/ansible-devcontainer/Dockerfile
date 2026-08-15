@@ -73,6 +73,8 @@ RUN useradd --create-home --shell /bin/zsh vscode \
     && echo "vscode ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/vscode \
     && chmod 0440 /etc/sudoers.d/vscode
 
+# Move default ansible.cfg location into the workspace.
+ENV ANSIBLE_CONFIG=/workspace/ansible.cfg
 # Suppress warning about auto-selected python interpreter.
 # Not sure what's supposed to be the solution for this warning (other than suppressing it).
 # See: https://docs.ansible.com/ansible-core/2.18/reference_appendices/interpreter_discovery.html
