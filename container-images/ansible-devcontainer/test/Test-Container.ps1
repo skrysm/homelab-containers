@@ -153,6 +153,7 @@ function Assert-ToolsAreAvailable {
         'python3',
         'pip3',
         'git',
+        'just',
         'ssh',
         'sshpass',
         'sudo',
@@ -192,13 +193,14 @@ function Assert-PythonPackagesAreAvailable {
     $pythonScript = @'
 import importlib.metadata
 
-for package_name in ("ansible", "ansible-lint", "mitogen", "passlib"):
+for package_name in ("ansible", "ansible-lint", "mitogen", "passlib", "typer"):
     print(f"{package_name}=={importlib.metadata.version(package_name)}")
 
 import ansible
 import ansible_mitogen
 import mitogen
 import passlib.hash
+import typer
 '@
 
     Invoke-ContainerCommand `

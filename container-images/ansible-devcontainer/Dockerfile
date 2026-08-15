@@ -33,6 +33,8 @@ RUN pip3 install --no-cache-dir \
     ansible-lint \
     mitogen \
     passlib \
+    # allows to build custom commands
+    typer \
     && ln -s \
         "$(python3 -c 'import ansible_mitogen, pathlib; print(pathlib.Path(ansible_mitogen.__file__).parent / "plugins/strategy")')" \
         /usr/local/lib/ansible_mitogen_strategy_plugins
@@ -50,6 +52,8 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     zsh \
     nano \
     wget \
+    # allows to build custom commands
+    just \
     # required for Ansible to connect to hosts via SSH
     openssh-client \
     # required for Ansible to ask for SSH passwords (i.e. when using "-k")
