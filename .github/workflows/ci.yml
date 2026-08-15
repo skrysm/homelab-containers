@@ -23,6 +23,11 @@ on:
         type: boolean
         required: false
         default: false
+      use-daily-build-cache:
+        description: Use a daily-scoped GitHub Actions cache for Docker builds.
+        type: boolean
+        required: false
+        default: true
       treat_as_scheduled_run:
         description: "Treat as 'scheduled' run (for testing purposes)."
         type: boolean
@@ -72,5 +77,5 @@ jobs:
     with:
       image-name: ${{ matrix.image }}
       publish: ${{ needs.select-container-images.outputs.publish_images == 'true' }}
-      use-daily-build-cache: true
+      use-daily-build-cache: ${{ github.event_name != 'workflow_dispatch' || inputs.use-daily-build-cache }}
       treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}

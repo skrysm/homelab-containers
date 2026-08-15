@@ -39,6 +39,11 @@ on:
         type: boolean
         required: false
         default: false
+      use-daily-build-cache:
+        description: Use a daily-scoped GitHub Actions cache for Docker builds.
+        type: boolean
+        required: false
+        default: true
       treat_as_scheduled_run:
         description: "Treat as 'scheduled' run (for testing purposes)."
         type: boolean
