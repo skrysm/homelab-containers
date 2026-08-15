@@ -73,7 +73,10 @@ RUN useradd --create-home --shell /bin/zsh vscode \
     && echo "vscode ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/vscode \
     && chmod 0440 /etc/sudoers.d/vscode
 
-# Move default ansible.cfg location into the workspace.
+# Specify location of ansible.cfg as environment variable. This way, it can be found no matter what folder
+# we're in. Also, this fixes the problem that Ansible won't load the ansible.cfg because the workspace folder
+# is mounted as world-writable and Ansible doesn't like this for security reasons.
+# See: https://docs.ansible.com/ansible/devel/reference_appendices/config.html#cfg-in-world-writable-dir
 ENV ANSIBLE_CONFIG=/workspace/ansible.cfg
 # Suppress warning about auto-selected python interpreter.
 # Not sure what's supposed to be the solution for this warning (other than suppressing it).
