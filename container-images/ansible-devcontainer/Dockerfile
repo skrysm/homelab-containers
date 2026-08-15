@@ -82,21 +82,27 @@ ENV ANSIBLE_PYTHON_INTERPRETER=auto_silent
 #   different (i.e. more unconventional) shortcuts that do not interfere with VSCode.
 ENV EDITOR=nano
 
+# Create directories for persisting container state (across devcontainer rebuilds):
+#
+# * codex: for OpenAI Code VSCode plugin
+# * zsh: for retaining the zsh history
+#
+# The idea is that /persist is mounted as a named volume in the devcontainer.
+RUN mkdir -p /persist/codex /persist/zsh \
+    && chown -R vscode:vscode /persist \
+    && chmod 0700 /persist
+ENV CODEX_HOME=/persist/codex
+
 # Run the following commands as the "vscode" user.
 USER vscode
 
 # Install oh-my-zsh.
 RUN git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git /home/vscode/.oh-my-zsh \
     && cp /home/vscode/.oh-my-zsh/templates/zshrc.zsh-template /home/vscode/.zshrc
+COPY --chown=vscode:vscode files/zsh/persist-history.zsh /home/vscode/.oh-my-zsh/custom/persist-history.zsh
 
 # Use the workspace's SSH directory for custom SSH configuration.
 RUN ln -s /workspace/ssh /home/vscode/.ssh
-
-# Pre-create auth directory for OpenAI Codex VSCode add-in. This way a named volume
-# can be mounted into this directory - and the directory remains writable to vscode.
-# (Without this, the directory would be owned by root and thus not writable by VSCode.)
-RUN mkdir -p /home/vscode/.codex \
-    && chmod 0700 /home/vscode/.codex
 
 # Just for convenience when running this container directly via "docker run -ti".
 CMD ["/bin/zsh"]

@@ -11,12 +11,13 @@ the image works as a basic Ansible devcontainer.
 It checks these cases:
 
 1. The default user is the non-root vscode user.
-2. The Codex directory exists with the expected permissions and owner.
-3. Expected command line tools are available.
-4. Passwordless sudo works for the vscode user.
-5. Python can import Ansible- and Mitogen-related packages.
-6. Ansible can execute a local ping module invocation.
-7. Ansible can load and execute Mitogen's strategy and action plugins.
+2. The persistent state directories are configured for Codex and zsh.
+3. zsh stores its history in the persistent state directory.
+4. Expected command line tools are available.
+5. Passwordless sudo works for the vscode user.
+6. Python can import Ansible- and Mitogen-related packages.
+7. Ansible can execute a local ping module invocation.
+8. Ansible can load and execute Mitogen's strategy and action plugins.
 
 .EXAMPLE
 ./Test-Container.ps1 -Image ansible-devcontainer:local
@@ -99,13 +100,37 @@ function Assert-DevcontainerFiles {
         )
 }
 
-function Assert-CodexDirectory {
+function Assert-PersistentState {
     Invoke-ContainerCommand `
-        -Description "Codex directory exists with mode 0700 and is owned by vscode" `
+        -Description "/persist has the expected permissions and owner" `
         -Command @(
             'sh',
             '-lc',
-            'test -d /home/vscode/.codex && test "$(stat -c %a /home/vscode/.codex)" = 700 && test "$(stat -c %U /home/vscode/.codex)" = vscode'
+            'test -d /persist && test "$(stat -c %a /persist)" = 700 && test "$(stat -c %U:%G /persist)" = vscode:vscode'
+        )
+
+    Invoke-ContainerCommand `
+        -Description "Codex uses its persistent directory" `
+        -Command @(
+            'sh',
+            '-lc',
+            'test "$CODEX_HOME" = /persist/codex && test -d "$CODEX_HOME" && test -w "$CODEX_HOME"'
+        )
+
+    Invoke-ContainerCommand `
+        -Description "zsh persistent directory is writable" `
+        -Command @(
+            'sh',
+            '-lc',
+            'test -d /persist/zsh && test -w /persist/zsh'
+        )
+
+    Invoke-ContainerCommand `
+        -Description "zsh history uses its persistent directory" `
+        -Command @(
+            'zsh',
+            '-ic',
+            'test "$HISTFILE" = /persist/zsh/history'
         )
 }
 
@@ -216,7 +241,7 @@ else {
 Assert-ContainerStarts
 Assert-DefaultUser
 Assert-DevcontainerFiles
-Assert-CodexDirectory
+Assert-PersistentState
 Assert-EditorEnvironment
 Assert-ToolsAreAvailable
 Assert-VersionCommandsWork
