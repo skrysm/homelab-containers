@@ -72,4 +72,5 @@ jobs:
     with:
       image-name: ${{ matrix.image }}
       publish: ${{ needs.select-container-images.outputs.publish_images == 'true' }}
+      use-build-cache: true
       treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}
