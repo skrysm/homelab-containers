@@ -43,7 +43,7 @@ RUN pip3 install --no-cache-dir \
 ENV ANSIBLE_STRATEGY_PLUGINS=/usr/local/lib/ansible_mitogen_strategy_plugins
 
 # Install additional software
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
+RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     # ping command
     iputils-ping \
     # required for VS Code/devcontainer basics
