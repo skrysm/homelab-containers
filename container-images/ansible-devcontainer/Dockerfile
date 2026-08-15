@@ -74,6 +74,14 @@ RUN useradd --create-home --shell /bin/zsh vscode \
 # See: https://docs.ansible.com/ansible-core/2.18/reference_appendices/interpreter_discovery.html
 ENV ANSIBLE_PYTHON_INTERPRETER=auto_silent
 
+# Switch from vim to nano as default editor (for example for ansible-vault).
+# This has also the nice side effect that nano has syntax highlighting enabled
+# by default whereas vim has not.
+# NOTE: For DevContainers I'd recommend nano over micro because micro's keyboard shortcuts
+#   often don't work because VSCode intercepts them and uses them for itself. Nano uses
+#   different (i.e. more unconventional) shortcuts that do not interfere with VSCode.
+ENV EDITOR=nano
+
 # Run the following commands as the "vscode" user.
 USER vscode
 
@@ -83,14 +91,6 @@ RUN git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git /home/vscode/.oh-
 
 # Use the workspace's SSH directory for custom SSH configuration.
 RUN ln -s /workspace/ssh /home/vscode/.ssh
-
-# Switch from vim to nano as default editor (for example for ansible-vault).
-# This has also the nice side effect that nano has syntax highlighting enabled
-# by default whereas vim has not.
-# NOTE: For DevContainers I'd recommend nano over micro because micro's keyboard shortcuts
-#   often don't work because VSCode intercepts them and uses them for itself. Nano uses
-#   different (i.e. more unconventional) shortcuts that do not interfere with VSCode.
-ENV EDITOR=nano
 
 # Pre-create auth directory for OpenAI Codex VSCode add-in. This way a named volume
 # can be mounted into this directory - and the directory remains writable to vscode.
