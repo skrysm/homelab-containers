@@ -111,7 +111,7 @@ USER vscode
 # Install oh-my-zsh.
 RUN git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git /home/vscode/.oh-my-zsh \
     && cp /home/vscode/.oh-my-zsh/templates/zshrc.zsh-template /home/vscode/.zshrc
-COPY --chown=vscode:vscode files/zsh/persist-history.zsh /home/vscode/.oh-my-zsh/custom/persist-history.zsh
+COPY --chown=vscode:vscode files/zsh/devcontainer.zsh /home/vscode/.oh-my-zsh/custom/devcontainer.zsh
 
 # Use the workspace's SSH directory for custom SSH configuration.
 RUN ln -s /workspace/ssh /home/vscode/.ssh
