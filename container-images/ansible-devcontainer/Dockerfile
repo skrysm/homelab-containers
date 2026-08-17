@@ -51,6 +51,8 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-
     sudo \
     zsh \
     nano \
+    # improved terminal pager
+    most \
     wget \
     # allows to build custom commands
     just \
