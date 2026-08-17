@@ -102,6 +102,9 @@ RUN mkdir -p /persist/codex /persist/zsh \
     && chmod 0700 /persist
 ENV CODEX_HOME=/persist/codex
 
+# Add a bin folder for the workspace
+ENV PATH="/workspace/.devcontainer/bin:${PATH}"
+
 # Run the following commands as the "vscode" user.
 USER vscode
 
