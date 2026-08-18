@@ -17,7 +17,8 @@ Exit code 999 means the comparison failed.
 When -PassThru is used, the script returns a hashtable with these properties instead of writing
 the Markdown output to the console:
 - PackageManifestChanged: Boolean indicating whether package changes were detected.
-- MarkdownLines: Markdown lines describing the package comparisons.
+- CheckedManifestLabels: Labels of the package manifests that were compared.
+- MarkdownLines: Markdown lines describing package changes.
 #>
 
 param (
@@ -114,18 +115,19 @@ try {
         }
     }
 
-    $markdownLines = @(
-        "**Package manifests checked:** $($checkedManifestLabels -join ', ')"
-        ''
-    )
-    $markdownLines += $changeMarkdownLines
-
     if ($PassThru) {
         return @{
             PackageManifestChanged = $hasChanges
-            MarkdownLines          = $markdownLines
+            CheckedManifestLabels  = $checkedManifestLabels
+            MarkdownLines          = $changeMarkdownLines
         }
     }
+
+    $markdownLines = @(
+        "<sub>Checked: $($checkedManifestLabels -join ', ')</sub>"
+        ''
+    )
+    $markdownLines += $changeMarkdownLines
 
     Write-Output $markdownLines
     if ($hasChanges) {

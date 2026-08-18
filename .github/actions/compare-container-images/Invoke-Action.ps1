@@ -56,8 +56,9 @@ else {
                 -PassThru
 
             @{
-                Changed     = $comparison.PackageManifestChanged
-                DetailLines = @($comparison.MarkdownLines)
+                Changed         = $comparison.PackageManifestChanged
+                DetailLines     = @($comparison.MarkdownLines)
+                SummaryMetadata = "Checked: $(@($comparison.CheckedManifestLabels) -join ', ')"
             }
         }
         'version' {
@@ -83,14 +84,19 @@ else {
     '✅ No changes detected'
 }
 
+$summaryMetadata = "Compared with <code>$PublishedImage</code>"
+if ($comparisonResult.SummaryMetadata) {
+    $summaryMetadata += " · $($comparisonResult.SummaryMetadata)"
+}
+
 $summaryLines = @(
     "## $ImageName"
     ''
     "### $comparisonTitle"
     ''
-    "**Result:** $comparisonStatus"
+    "**$comparisonStatus**"
     ''
-    "**Published comparison image:** ``$PublishedImage``"
+    "<sub>$summaryMetadata</sub>"
     ''
 )
 

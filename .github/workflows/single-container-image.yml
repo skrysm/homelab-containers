@@ -270,9 +270,9 @@ jobs:
           @(
               '### Version'
               ''
-              'The primary software version detected inside the candidate image is used as the container image tag.'
+              "**``${{ steps.version.outputs.version }}``**"
               ''
-              "**Detected version:** ``${{ steps.version.outputs.version }}``"
+              '<sub>Primary software version; used as the container image tag.</sub>'
           ) >> $env:GITHUB_STEP_SUMMARY
 
       # ---------------------------------------------------------------------------
