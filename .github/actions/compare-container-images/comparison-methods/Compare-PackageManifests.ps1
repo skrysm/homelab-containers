@@ -73,7 +73,8 @@ try {
     # Calculate changes for every selected package manifest type
     #
     $hasChanges = $false
-    $markdownLines = @()
+    $checkedManifestLabels = @()
+    $changeMarkdownLines = @()
 
     foreach ($manifestType in $normalizedManifestTypes) {
         # Each manifest script returns the same Label/Type/Packages structure.
@@ -81,15 +82,15 @@ try {
 
         $publishedManifest = & $manifestScript -Image $PublishedImage
         $candidateManifest = & $manifestScript -Image $CandidateImage
-
-        $markdownLines += "### $($candidateManifest.Label)"
-        $markdownLines += ''
+        $checkedManifestLabels += $candidateManifest.Label
 
         # Package names are not comparable across different OS package ecosystems.
         if ($publishedManifest.Type -ne $candidateManifest.Type) {
             $hasChanges = $true
-            $markdownLines += "Package manifest type changed from ``$($publishedManifest.Type)`` to ``$($candidateManifest.Type)``."
-            $markdownLines += ''
+            $changeMarkdownLines += "### $($candidateManifest.Label)"
+            $changeMarkdownLines += ''
+            $changeMarkdownLines += "Package manifest type changed from ``$($publishedManifest.Type)`` to ``$($candidateManifest.Type)``."
+            $changeMarkdownLines += ''
             continue
         }
 
@@ -99,21 +100,25 @@ try {
                 -CandidatePackages $candidateManifest.Packages
         )
 
-        if ($changeLines.Count -eq 0) {
-            $markdownLines += 'No package version changes detected.'
-        }
-        else {
+        if ($changeLines.Count -gt 0) {
             $hasChanges = $true
             $packageCount = $changeLines.Count
             $packageIntroText = if ($packageCount -eq 1) { 'package has' } else { 'packages have' }
 
-            $markdownLines += "**$packageCount $packageIntroText changed:**"
-            $markdownLines += ''
-            $markdownLines += $changeLines
+            $changeMarkdownLines += "### $($candidateManifest.Label)"
+            $changeMarkdownLines += ''
+            $changeMarkdownLines += "**$packageCount $packageIntroText changed:**"
+            $changeMarkdownLines += ''
+            $changeMarkdownLines += $changeLines
+            $changeMarkdownLines += ''
         }
-
-        $markdownLines += ''
     }
+
+    $markdownLines = @(
+        "**Package manifests checked:** $($checkedManifestLabels -join ', ')"
+        ''
+    )
+    $markdownLines += $changeMarkdownLines
 
     if ($PassThru) {
         return @{
