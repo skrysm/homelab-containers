@@ -193,7 +193,7 @@ jobs:
         run: |
           & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
 
-      - name: Determine new container image tag from candidate image
+      - name: Determine primary software version from candidate image
         id: version
         shell: gha-pwsh {0}
         run: |
