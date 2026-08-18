@@ -70,6 +70,8 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-
     yq \
     shellcheck \
     shfmt \
+    # Sandbox for AI agent commands
+    bubblewrap \
     # Remove downloaded package list (they can always be re-retrieved via apt update)
     && rm -rf /var/lib/apt/lists/*
 

@@ -165,7 +165,8 @@ function Assert-ToolsAreAvailable {
         'unzip',
         'rsync',
         'jq',
-        'yq'
+        'yq',
+        'bwrap'
     )
 
     $toolList = $tools -join ' '
