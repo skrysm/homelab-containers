@@ -46,22 +46,25 @@ ENV ANSIBLE_STRATEGY_PLUGINS=/usr/local/lib/ansible_mitogen_strategy_plugins
 RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     # ping command
     iputils-ping \
+    # DNS lookup commands (dig and nslookup)
+    dnsutils \
     # required for VS Code/devcontainer basics
     git \
     sudo \
     zsh \
     nano \
-    # improved terminal pager
     most \
     wget \
-    # allows to build custom commands
-    just \
+    curl \
+    unzip \
     # required for Ansible to connect to hosts via SSH
     openssh-client \
     # required for Ansible to ask for SSH passwords (i.e. when using "-k")
     sshpass \
     # required for some dependency of ansible
     libonig-dev \
+    # required for the ansible.posix.synchronize module
+    rsync \
     # Utilities useful to AI agents
     jq \
     yq \

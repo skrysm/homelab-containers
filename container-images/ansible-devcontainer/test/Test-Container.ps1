@@ -145,21 +145,27 @@ function Assert-EditorEnvironment {
 }
 
 function Assert-ToolsAreAvailable {
+    # NOTE: This list exists mainly to prevent accidental removal of necessary/helpful tools.
     $tools = @(
         'ansible',
         'ansible-playbook',
         'ansible-vault',
         'ansible-lint',
         'python3',
-        'pip3',
         'git',
-        'just',
         'ssh',
         'sshpass',
         'sudo',
-        'zsh',
         'nano',
-        'ping'
+        'ping',
+        'dig',
+        'nslookup',
+        'curl',
+        'wget',
+        'unzip',
+        'rsync',
+        'jq',
+        'yq'
     )
 
     $toolList = $tools -join ' '
