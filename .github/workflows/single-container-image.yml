@@ -279,6 +279,10 @@ jobs:
       - name: "Build candidate container image | multi-platform  | ${{ env.CANDIDATE_IMAGE }}"
         if: steps.publish_decision.outputs.continue_workflow == 'true'
         uses: docker/build-push-action@v7
+        env:
+          # See: https://github.com/docker/build-push-action/tree/v7/#environment-variables
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: ./${{ env.BUILD_CONTEXT }}
           platforms: ${{ steps.configuration.outputs.platforms }}
