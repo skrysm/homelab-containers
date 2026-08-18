@@ -220,14 +220,6 @@ jobs:
 
           "version=$version" >> $env:GITHUB_OUTPUT
 
-          @(
-              "## Container image version | ${{ inputs.image-name }}"
-              ""
-              "The primary software version detected inside the candidate image is used as the container image tag."
-              ""
-              "**Detected version:** ``$version``"
-          ) >> $env:GITHUB_STEP_SUMMARY
-
       # ---------------------------------------------------------------------------
       #
       # Compare and decide whether to publish
@@ -266,7 +258,22 @@ jobs:
           Write-Host "Publish image: $publishImage"
 
           "continue_workflow=$($continueWorkflow.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "is_scheduled_run=$($isScheduledRun.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "publish_image=$($publishImage.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Add container image version to workflow summary
+        # If this is a scheduled run, only print the version if the image is to be published (to reduce workflow summary "volume").
+        # For any other run, always print this.
+        if: steps.publish_decision.outputs.is_scheduled_run != 'true' || steps.publish_decision.outputs.publish_image == 'true'
+        shell: gha-pwsh {0}
+        run: |
+          @(
+              "## Container image version | ${{ inputs.image-name }}"
+              ''
+              'The primary software version detected inside the candidate image is used as the container image tag.'
+              ''
+              "**Detected version:** ``${{ steps.version.outputs.version }}``"
+          ) >> $env:GITHUB_STEP_SUMMARY
 
       # ---------------------------------------------------------------------------
       #
