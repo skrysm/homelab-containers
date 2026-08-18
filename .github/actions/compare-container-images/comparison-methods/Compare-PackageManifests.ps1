@@ -87,7 +87,7 @@ try {
         # Package names are not comparable across different OS package ecosystems.
         if ($publishedManifest.Type -ne $candidateManifest.Type) {
             $hasChanges = $true
-            $changeMarkdownLines += "### $($candidateManifest.Label)"
+            $changeMarkdownLines += "#### $($candidateManifest.Label)"
             $changeMarkdownLines += ''
             $changeMarkdownLines += "Package manifest type changed from ``$($publishedManifest.Type)`` to ``$($candidateManifest.Type)``."
             $changeMarkdownLines += ''
@@ -105,7 +105,7 @@ try {
             $packageCount = $changeLines.Count
             $packageIntroText = if ($packageCount -eq 1) { 'package has' } else { 'packages have' }
 
-            $changeMarkdownLines += "### $($candidateManifest.Label)"
+            $changeMarkdownLines += "#### $($candidateManifest.Label)"
             $changeMarkdownLines += ''
             $changeMarkdownLines += "**$packageCount $packageIntroText changed:**"
             $changeMarkdownLines += ''

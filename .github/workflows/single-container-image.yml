@@ -268,7 +268,7 @@ jobs:
         shell: gha-pwsh {0}
         run: |
           @(
-              "## Container image version | ${{ inputs.image-name }}"
+              '### Version'
               ''
               'The primary software version detected inside the candidate image is used as the container image tag.'
               ''

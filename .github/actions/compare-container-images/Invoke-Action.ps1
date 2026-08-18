@@ -27,7 +27,7 @@ if (-not (Test-Path -LiteralPath $BuildContext -PathType Container)) {
 
 $comparisonTitle = switch ($ComparisonMethod) {
     'package-manifest' { 'Package manifest' }
-    'version' { 'Container image version' }
+    'version' { 'Version comparison' }
     default { throw "Unsupported comparison method '$ComparisonMethod'. Supported methods are 'package-manifest' and 'version'." }
 }
 
@@ -84,7 +84,9 @@ else {
 }
 
 $summaryLines = @(
-    "## $comparisonTitle comparison | $ImageName"
+    "## $ImageName"
+    ''
+    "### $comparisonTitle"
     ''
     "**Result:** $comparisonStatus"
     ''
