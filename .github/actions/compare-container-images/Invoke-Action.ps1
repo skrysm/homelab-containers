@@ -31,8 +31,18 @@ $comparisonTitle = switch ($ComparisonMethod) {
     default { throw "Unsupported comparison method '$ComparisonMethod'. Supported methods are 'package-manifest' and 'version'." }
 }
 
-docker manifest inspect $PublishedImage *> $null
-$publishedImageExists = $LASTEXITCODE -eq 0
+$manifestInspectionOutput = @(docker manifest inspect $PublishedImage 2>&1)
+$manifestInspectionExitCode = $LASTEXITCODE
+$publishedImageExists = $manifestInspectionExitCode -eq 0
+
+if (-not $publishedImageExists) {
+    $manifestInspectionMessage = ($manifestInspectionOutput -join [Environment]::NewLine).Trim()
+    $publishedImageMissing = $manifestInspectionMessage -match '(?i)manifest unknown|no such manifest|manifest[^\r\n]*not found'
+
+    if (-not $publishedImageMissing) {
+        throw "Failed to inspect published image '$PublishedImage'. Docker exited with code $manifestInspectionExitCode.$([Environment]::NewLine)$manifestInspectionMessage"
+    }
+}
 
 if (-not $publishedImageExists) {
     $comparisonResult = @{
