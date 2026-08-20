@@ -118,4 +118,5 @@ if ($detailLines.Count -gt 0) {
 Write-Host "Container image comparison result: $comparisonStatus"
 
 "changes_detected=$($comparisonResult.Changed.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+"published_image_exists=$($publishedImageExists.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 $summaryLines >> $env:GITHUB_STEP_SUMMARY

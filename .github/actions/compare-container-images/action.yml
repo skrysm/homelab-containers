@@ -33,6 +33,9 @@ outputs:
   changes_detected:
     description: Whether changes were detected between the candidate and published image.
     value: ${{ steps.container_image_comparison.outputs.changes_detected }}
+  published_image_exists:
+    description: Whether the published image exists.
+    value: ${{ steps.container_image_comparison.outputs.published_image_exists }}
 
 runs:
   using: composite

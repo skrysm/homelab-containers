@@ -237,6 +237,39 @@ jobs:
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
+      - name: Ensure primary software version has not decreased
+        if: steps.container_image_comparison.outputs.published_image_exists == 'true'
+        shell: gha-pwsh {0}
+        run: |
+          $publishedImage = '${{ env.FINAL_IMAGE_NAME }}:latest'
+          $versionOutput = @(& './${{ env.BUILD_CONTEXT }}/Get-ContainerImageVersion.ps1' -Image $publishedImage)
+
+          if ($versionOutput.Count -ne 1) {
+              throw "Expected exactly one container image version from '$publishedImage', but received $($versionOutput.Count)."
+          }
+
+          $detectedPublishedVersion = [string] $versionOutput[0]
+          if ($detectedPublishedVersion -notmatch '^[0-9]+\.[0-9]+(?:\.[0-9]+)?$') {
+              throw "Invalid container image version '$detectedPublishedVersion' from '$publishedImage'. Expected 'x.y' or 'x.y.z', with numeric components."
+          }
+
+          $normalizedPublishedVersion = if ($detectedPublishedVersion -match '^[0-9]+\.[0-9]+$') {
+              "$detectedPublishedVersion.0"
+          }
+          else {
+              $detectedPublishedVersion
+          }
+
+          $candidateVersion = [version] '${{ steps.version.outputs.version }}'
+          $publishedVersion = [version] $normalizedPublishedVersion
+
+          Write-Host "Candidate version: $candidateVersion"
+          Write-Host "Published version: $publishedVersion"
+
+          if ($candidateVersion -lt $publishedVersion) {
+              throw "Candidate software version '$candidateVersion' is older than the currently published version '$publishedVersion'."
+          }
+
       - name: Decide on image publishing
         id: publish_decision
         shell: gha-pwsh {0}
