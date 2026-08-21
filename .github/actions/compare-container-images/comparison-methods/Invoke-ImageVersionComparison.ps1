@@ -11,24 +11,16 @@ param (
     [string] $PublishedImage
 )
 
-$versionScript = "$BuildContext/Get-ContainerImageVersion.ps1"
+# Shared workflow scripts live under .github, outside this action's directory.
+$githubDirectory = (Resolve-Path "$PSScriptRoot/../../..").Path
+$versionHelperScript = "$githubDirectory/scripts/Get-NormalizedContainerImageVersion.ps1"
 
-if (-not (Test-Path -LiteralPath $versionScript -PathType Leaf)) {
-    throw "Version script '$versionScript' was not found."
+if (-not (Test-Path -LiteralPath $versionHelperScript -PathType Leaf)) {
+    throw "Version helper script '$versionHelperScript' was not found."
 }
 
-function Get-ImageVersion([string] $Image) {
-    $versionOutput = @(& $versionScript -Image $Image)
-
-    if ($versionOutput.Count -ne 1 -or -not $versionOutput[0]) {
-        throw "Version script '$versionScript' did not return exactly one version for image '$Image'."
-    }
-
-    return [string] $versionOutput[0]
-}
-
-$candidateVersion = Get-ImageVersion -Image $CandidateImage
-$publishedVersion = Get-ImageVersion -Image $PublishedImage
+$candidateVersion = & $versionHelperScript -BuildContext $BuildContext -Image $CandidateImage
+$publishedVersion = & $versionHelperScript -BuildContext $BuildContext -Image $PublishedImage
 
 $detailLines = @(
     "**Candidate version:** ``$candidateVersion``"
