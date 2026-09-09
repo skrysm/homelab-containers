@@ -13,7 +13,7 @@ param (
 
 # Shared workflow scripts live under .github, outside this action's directory.
 $githubDirectory = (Resolve-Path "$PSScriptRoot/../../..").Path
-$versionHelperScript = "$githubDirectory/scripts/Get-NormalizedContainerImageVersion.ps1"
+$versionHelperScript = "$githubDirectory/scripts/Get-NormalizedPrimarySoftwareVersion.ps1"
 
 if (-not (Test-Path -LiteralPath $versionHelperScript -PathType Leaf)) {
     throw "Version helper script '$versionHelperScript' was not found."

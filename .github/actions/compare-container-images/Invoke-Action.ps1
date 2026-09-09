@@ -27,22 +27,12 @@ if (-not (Test-Path -LiteralPath $BuildContext -PathType Container)) {
 
 $comparisonTitle = switch ($ComparisonMethod) {
     'package-manifest' { 'Package manifest' }
-    'version' { 'Version comparison' }
+    'version' { 'Primary software version comparison' }
     default { throw "Unsupported comparison method '$ComparisonMethod'. Supported methods are 'package-manifest' and 'version'." }
 }
 
-$manifestInspectionOutput = @(docker manifest inspect $PublishedImage 2>&1)
-$manifestInspectionExitCode = $LASTEXITCODE
-$publishedImageExists = $manifestInspectionExitCode -eq 0
-
-if (-not $publishedImageExists) {
-    $manifestInspectionMessage = ($manifestInspectionOutput -join [Environment]::NewLine).Trim()
-    $publishedImageMissing = $manifestInspectionMessage -match '(?i)manifest unknown|no such manifest|manifest[^\r\n]*not found'
-
-    if (-not $publishedImageMissing) {
-        throw "Failed to inspect published image '$PublishedImage'. Docker exited with code $manifestInspectionExitCode.$([Environment]::NewLine)$manifestInspectionMessage"
-    }
-}
+$githubDirectory = (Resolve-Path "$PSScriptRoot/../..").Path
+$publishedImageExists = & "$githubDirectory/scripts/Test-ContainerImageExists.ps1" -Image $PublishedImage
 
 if (-not $publishedImageExists) {
     $comparisonResult = @{

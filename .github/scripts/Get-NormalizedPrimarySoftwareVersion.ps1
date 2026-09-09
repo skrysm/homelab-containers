@@ -11,19 +11,19 @@ param (
 $ErrorActionPreference = 'Stop'
 $VERSION_PATTERN = '^[0-9]+\.[0-9]+(?:\.[0-9]+)?$'
 
-$versionScript = "$BuildContext/Get-ContainerImageVersion.ps1"
+$versionScript = "$BuildContext/Get-PrimarySoftwareVersion.ps1"
 if (-not (Test-Path -LiteralPath $versionScript -PathType Leaf)) {
     throw "Version script '$versionScript' was not found."
 }
 
 $versionOutput = @(& $versionScript -Image $Image)
 if ($versionOutput.Count -ne 1) {
-    throw "Expected exactly one container image version from '$Image', but received $($versionOutput.Count)."
+    throw "Expected exactly one primary software version from '$Image', but received $($versionOutput.Count)."
 }
 
 $detectedVersion = [string] $versionOutput[0]
 if ($detectedVersion -notmatch $VERSION_PATTERN) {
-    throw "Invalid container image version '$detectedVersion' from '$Image'. Expected 'x.y' or 'x.y.z', with numeric components."
+    throw "Invalid primary software version '$detectedVersion' from '$Image'. Expected 'x.y' or 'x.y.z', with numeric components."
 }
 
 # Renovate and Dependabot treat an x.y Docker tag as a rolling minor-version tag and preserve
@@ -36,4 +36,4 @@ else {
     $detectedVersion
 }
 
-return [version] $normalizedVersion
+return [Version]::new($normalizedVersion)

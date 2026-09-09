@@ -59,6 +59,7 @@ else {
 
     $sharedFilesChanged = Test-PathChanged @(
         '.github/actions/*'
+        '.github/scripts/*'
         '.github/workflows/single-container-image.yml'
         # Include the calling workflows so that changes to them trigger builds for all(!) images.
         # Without these entries, all image builds would be skipped.
