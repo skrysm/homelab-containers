@@ -18,6 +18,9 @@ $inspectionMessage = ($inspectionOutput -join [Environment]::NewLine).Trim()
 $imageNotFound = $inspectionMessage -match '(?i)manifest unknown|no such manifest|manifest[^\r\n]*not found'
 
 if ($imageNotFound) {
+    # The gha-pwsh wrapper propagates $LASTEXITCODE after a step completes. Clear the expected
+    # Docker failure in the caller's scope so a successfully handled missing image doesn't fail the step.
+    $global:LASTEXITCODE = 0
     return $false
 }
 
