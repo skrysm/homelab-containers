@@ -119,6 +119,10 @@ if ($ExpectedDigest -notmatch '^sha256:[0-9a-f]{64}$') {
     throw "Invalid expected image digest '$ExpectedDigest'."
 }
 
+if ($Version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$') {
+    throw "Invalid container image version '$Version'. Expected 'x.y.z.d', with numeric components."
+}
+
 $EXPECTED_DOCKER_PLATFORMS = @()
 foreach ($platform in ($ExpectedPlatforms -split ',').Trim()) {
     if ($platform) {

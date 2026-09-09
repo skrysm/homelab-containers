@@ -50,10 +50,11 @@ on:
         required: false
         default: false
 
-# Serialize builds of the same image and ref so cache exports and image publication can't overlap.
-# Keep the running build; GitHub coalesces multiple pending builds by retaining only the newest one.
+# Serialize every publication of an image so two runs cannot select the same image revision
+# (i.e. "d" in a "a.b.c.d" version). Non-publishing builds remain scoped by ref so independent
+# PR builds do not block one another.
 concurrency:
-  group: container-image-${{ github.ref }}-${{ inputs.image-name }}
+  group: container-image-${{ inputs.image-name }}-${{ inputs.publish && 'publish' || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -133,7 +134,10 @@ jobs:
           # images are refreshed at least daily.
           # NOTE: GitHub additionally scopes caches to their branch or PR merge ref. For example,
           #   one PR can't read or write another PR's cache, and PR caches aren't available on main.
-          $cacheScope = '${{ inputs.image-name }}-' + [DateTime]::UtcNow.ToString('yyyy-MM-dd')
+          # Publishing and non-publishing runs use different concurrency groups and can overlap.
+          # Keep their cache exports separate so they never write the same cache concurrently.
+          $BUILD_MODE = "${{ inputs.publish && 'publish' || 'build' }}"
+          $cacheScope = '${{ inputs.image-name }}-' + $BUILD_MODE + '-' + [DateTime]::UtcNow.ToString('yyyy-MM-dd')
 
           "cache_from=type=gha,scope=$cacheScope" >> $env:GITHUB_OUTPUT
           "cache_to=type=gha,scope=$cacheScope,mode=max" >> $env:GITHUB_OUTPUT
@@ -194,10 +198,10 @@ jobs:
           & './${{ env.BUILD_CONTEXT }}/test/Test-Container.ps1' -Image '${{ env.CANDIDATE_IMAGE }}' -GitHubOutput
 
       - name: Determine primary software version from candidate image
-        id: version
+        id: primary_software_version
         shell: gha-pwsh {0}
         run: |
-          $version = & './.github/scripts/Get-NormalizedContainerImageVersion.ps1' `
+          $version = & './.github/scripts/Get-NormalizedPrimarySoftwareVersion.ps1' `
               -BuildContext './${{ env.BUILD_CONTEXT }}' `
               -Image '${{ env.CANDIDATE_IMAGE }}'
 
@@ -220,15 +224,44 @@ jobs:
           candidate-image: ${{ env.CANDIDATE_IMAGE }}
           published-image: ${{ env.FINAL_IMAGE_NAME }}:latest
 
-      - name: Ensure primary software version has not decreased
+      - name: Read versions from latest published image
+        id: published_versions
         if: steps.container_image_comparison.outputs.published_image_exists == 'true'
         shell: gha-pwsh {0}
         run: |
           $publishedImage = '${{ env.FINAL_IMAGE_NAME }}:latest'
-          $candidateVersion = [version] '${{ steps.version.outputs.version }}'
-          $publishedVersion = & './.github/scripts/Get-NormalizedContainerImageVersion.ps1' `
+
+          # Get the primary software version from the image's content (via the "Get-PrimarySoftwareVersion.ps1" scripts).
+          $publishedPrimarySoftwareVersion = & './.github/scripts/Get-NormalizedPrimarySoftwareVersion.ps1' `
               -BuildContext './${{ env.BUILD_CONTEXT }}' `
               -Image $publishedImage
+
+          # Obtain image version from label.
+          # NOTE: We can't use the image tag for this as an image can have multiple tags
+          #   (and we pulled it via the ":latest" tag).
+          $publishedContainerImageVersion = docker image inspect `
+              --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' `
+              $publishedImage
+          if ($LASTEXITCODE -ne 0) {
+              throw "Failed to inspect the container image version label on '$publishedImage'."
+          }
+          $publishedContainerImageVersion = ([string] $publishedContainerImageVersion).Trim()
+          if (-not $publishedContainerImageVersion -or $publishedContainerImageVersion -eq '<no value>') {
+              throw "Published image '$publishedImage' does not have a container image version label."
+          }
+          elseif ($publishedContainerImageVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?$') {
+              throw "Invalid container image version label '$publishedContainerImageVersion' on '$publishedImage'."
+          }
+
+          "primary_software_version=$($publishedPrimarySoftwareVersion.ToString())" >> $env:GITHUB_OUTPUT
+          "container_image_version=$publishedContainerImageVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Ensure primary software version has not decreased
+        if: steps.container_image_comparison.outputs.published_image_exists == 'true'
+        shell: gha-pwsh {0}
+        run: |
+          $candidateVersion = [version] '${{ steps.primary_software_version.outputs.version }}'
+          $publishedVersion = [version] '${{ steps.published_versions.outputs.primary_software_version }}'
 
           Write-Host "Candidate version: $candidateVersion"
           Write-Host "Published version: $publishedVersion"
@@ -236,6 +269,17 @@ jobs:
           if ($candidateVersion -lt $publishedVersion) {
               throw "Candidate software version '$candidateVersion' is older than the currently published version '$publishedVersion'."
           }
+
+      - name: Determine container image version
+        id: version
+        shell: gha-pwsh {0}
+        run: |
+          $version = & './.github/scripts/Get-NextContainerImageVersion.ps1' `
+              -PrimarySoftwareVersion '${{ steps.primary_software_version.outputs.version }}' `
+              -PublishedContainerImageVersion '${{ steps.published_versions.outputs.container_image_version }}'
+
+          Write-Host "Container image version: $version"
+          "version=$($version.ToString())" >> $env:GITHUB_OUTPUT
 
       - name: Decide on image publishing
         id: publish_decision
@@ -272,7 +316,7 @@ jobs:
               ''
               "**``${{ steps.version.outputs.version }}``**"
               ''
-              '<sub>Primary software version; used as the container image tag.</sub>'
+              '<sub>Container image version; primary software version: ``${{ steps.primary_software_version.outputs.version }}``.</sub>'
           ) >> $env:GITHUB_STEP_SUMMARY
 
       # ---------------------------------------------------------------------------
@@ -393,6 +437,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure container image version has not already been published
+        if: steps.publish_decision.outputs.publish_image == 'true'
+        shell: gha-pwsh {0}
+        run: |
+          $versionedImage = '${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}'
+          $containerImageVersionExists = & './.github/scripts/Test-ContainerImageExists.ps1' -Image $versionedImage
+
+          if ($containerImageVersionExists) {
+              throw "Container image version '$versionedImage' has already been published and will not be overwritten."
+          }
 
       - name: "Publish multi-platform image | ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}"
         id: publish_image

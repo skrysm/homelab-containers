@@ -6,7 +6,7 @@ inputs:
     description: Fully qualified container image name without a tag.
     required: true
   version:
-    description: Published container image version tag.
+    description: Published x.y.z.d container image version tag.
     required: true
   expected-digest:
     description: Expected digest for both the version and latest tags.

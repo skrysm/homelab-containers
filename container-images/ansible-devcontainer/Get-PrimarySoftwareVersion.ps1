@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 
 #
-# Determines the container image version from the installed Ansible package.
+# Determines the primary software version from the installed Ansible package.
 #
 
 param (

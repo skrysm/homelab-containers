@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - ".github/actions/**"
+      - ".github/scripts/**"
       - ".github/workflows/ci.yml"
       - ".github/workflows/pr.yml"
       - ".github/workflows/single-container-image.yml"
