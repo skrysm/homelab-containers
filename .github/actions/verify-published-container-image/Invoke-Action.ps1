@@ -134,23 +134,31 @@ if ($EXPECTED_DOCKER_PLATFORMS.Count -eq 0) {
     throw 'At least one expected Docker platform must be specified.'
 }
 
-$LATEST_IMAGE = "${Image}:latest"
-$VERSIONED_IMAGE = "${Image}:$Version"
+$versionValue = [Version]::new($Version)
+$versionedImage = "${Image}:$Version"
+$publishedImages = @(
+    $versionedImage
+    "${Image}:$($versionValue.Major).$($versionValue.Minor).$($versionValue.Build)"
+    "${Image}:$($versionValue.Major).$($versionValue.Minor)"
+    "${Image}:$($versionValue.Major)"
+    "${Image}:latest"
+)
 
-$LATEST_MANIFEST = Get-VerifiedImageManifest `
-    -ImageReference $LATEST_IMAGE `
-    -ExpectedImageDigest $ExpectedDigest
+$versionedManifest = $null
+# Verify that the immutable version tag and every rolling alias resolve to the published digest.
+foreach ($publishedImage in $publishedImages) {
+    $manifest = Get-VerifiedImageManifest `
+        -ImageReference $publishedImage `
+        -ExpectedImageDigest $ExpectedDigest
 
-$VERSIONED_MANIFEST = Get-VerifiedImageManifest `
-    -ImageReference $VERSIONED_IMAGE `
-    -ExpectedImageDigest $ExpectedDigest
+    if ($publishedImage -eq $versionedImage) {
+        # Retain this manifest for the platform check after every tag has been verified.
+        $versionedManifest = $manifest
+    }
+}
 
+# All aliases resolve to this same manifest digest, so its platform list represents every tag.
 Assert-ExpectedImagePlatforms `
-    -ImageReference $LATEST_IMAGE `
-    -Manifest $LATEST_MANIFEST `
-    -ExpectedDockerPlatforms $EXPECTED_DOCKER_PLATFORMS
-
-Assert-ExpectedImagePlatforms `
-    -ImageReference $VERSIONED_IMAGE `
-    -Manifest $VERSIONED_MANIFEST `
+    -ImageReference $versionedImage `
+    -Manifest $versionedManifest `
     -ExpectedDockerPlatforms $EXPECTED_DOCKER_PLATFORMS

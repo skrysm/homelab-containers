@@ -206,6 +206,8 @@ jobs:
               -Image '${{ env.CANDIDATE_IMAGE }}'
 
           "version=$($version.ToString())" >> $env:GITHUB_OUTPUT
+          "major_minor_version=$($version.Major).$($version.Minor)" >> $env:GITHUB_OUTPUT
+          "major_version=$($version.Major)" >> $env:GITHUB_OUTPUT
 
       # ---------------------------------------------------------------------------
       #
@@ -466,6 +468,9 @@ jobs:
           cache-from: ${{ steps.build_cache.outputs.cache_from }}
           tags: |
             ${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}
+            ${{ env.FINAL_IMAGE_NAME }}:${{ steps.primary_software_version.outputs.version }}
+            ${{ env.FINAL_IMAGE_NAME }}:${{ steps.primary_software_version.outputs.major_minor_version }}
+            ${{ env.FINAL_IMAGE_NAME }}:${{ steps.primary_software_version.outputs.major_version }}
             ${{ env.FINAL_IMAGE_NAME }}:latest
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}

@@ -9,7 +9,7 @@ inputs:
     description: Published x.y.z.d container image version tag.
     required: true
   expected-digest:
-    description: Expected digest for both the version and latest tags.
+    description: Expected digest for all published tags.
     required: true
   expected-platforms:
     description: Comma-separated Docker platforms expected in the published image.
