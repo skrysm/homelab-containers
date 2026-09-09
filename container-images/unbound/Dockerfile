@@ -26,8 +26,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 # We must chown /run or else Unbound will fail to start.
 RUN chown unbound:unbound /run
-# Note that Unbound already does privilege dropping. But this makes it never run
-# as root (and also makes any interactive shell inside the container run as non-root).
+# Start Unbound as non-root instead of relying on its internal privilege drop.
+# This also makes any interactive shell inside the container run as non-root.
 USER unbound:unbound
 
 #
