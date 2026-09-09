@@ -14,6 +14,7 @@ It checks the following cases:
 - A custom local A record from the mounted test config resolves over UDP.
 - The same custom local A record resolves over TCP.
 - A real-world DNS name resolves through Unbound.
+- The Unbound logs contain no warnings or errors.
 
 .EXAMPLE
 ./Test-Container.ps1 -Image homelab-unbound:local
@@ -262,6 +263,18 @@ function Assert-UnboundDoesNotRunAsRoot {
     Write-Host "Verified Unbound does not run as root (effective user ID: $effectiveUserId)."
 }
 
+function Assert-UnboundLogsContainNoWarningsOrErrors {
+    $logLines = @(Invoke-DockerCompose logs --no-color unbound)
+    $problemLines = @($logLines | Where-Object { $_ -match '(?i)\b(?:warning|error):' })
+
+    if ($problemLines.Count -gt 0) {
+        $problemText = ($problemLines | Out-String).Trim()
+        Write-Error "Expected Unbound logs not to contain warnings or errors, but found $($problemLines.Count):`n$problemText"
+    }
+
+    Write-Host "Verified Unbound logs contain no warnings or errors."
+}
+
 function Assert-NsLookupIsAvailable {
     if (-not (Get-Command nslookup -ErrorAction SilentlyContinue)) {
         Write-Error "The 'nslookup' command is required to run this test."
@@ -331,6 +344,8 @@ try {
     $realWorldAddresses = Invoke-DnsLookup -Name $RealWorldName
     Assert-ResolvesToPublicAddress -Addresses $realWorldAddresses -Name $RealWorldName
     Write-Host "Verified real-world DNS lookup for '$RealWorldName' -> '$($realWorldAddresses[0])'."
+
+    Assert-UnboundLogsContainNoWarningsOrErrors
 
     $failed = $false
 }
