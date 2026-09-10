@@ -42,6 +42,7 @@ USER unbound:unbound
 # Command parameters:
 #
 # -d    do not fork into the background.
-# -v    verbose (without this, Unbound won't even write a startup notification.)
-#       Note that DNS queries are not(!) logged through this.
+# -v    enables early startup logging before the configuration is loaded.
+#       It also adds one to the configured verbosity. This image configures
+#       verbosity 0, resulting in effective runtime verbosity 1.
 CMD ["unbound", "-d", "-v"]
