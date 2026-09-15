@@ -40,16 +40,19 @@ $PROJECT_NAME = "unbound-test-$([Guid]::NewGuid().ToString('N'))"
 $CUSTOM_NAME = 'healthcheck.homelab.test'
 $CUSTOM_ADDRESS = '1.2.3.4'
 
+# Writes the specified text as a visually distinct section title in the test output.
 function Write-Title([string] $Text) {
     Write-Host -ForegroundColor Cyan $Text
     Write-Host
 }
 
+# Prints Docker client and server version information for diagnostics.
 function Write-DiagnosticsHeader {
     docker version --format 'Docker client: {{.Client.Version}} {{.Client.Os}}/{{.Client.Arch}}{{println}}Docker server: {{.Server.Version}} {{.Server.Os}}/{{.Server.Arch}}'
     Write-Host
 }
 
+# Runs Docker Compose with the specified arguments for this test's isolated project and throws on failure.
 function Invoke-DockerCompose {
     param (
         [Parameter(ValueFromRemainingArguments = $true)]
@@ -79,6 +82,7 @@ function Invoke-DockerCompose {
     }
 }
 
+# DNS-resolves the specified name through the host port exposed by the Unbound service.
 function Invoke-DnsLookup([string] $Name, [bool] $UseTcp = $false) {
     $previousErrorActionPreference = $ErrorActionPreference
     try {
@@ -119,6 +123,7 @@ function Invoke-DnsLookup([string] $Name, [bool] $UseTcp = $false) {
     return @($addresses)
 }
 
+# Extracts unique IP addresses from the specified (Windows or Linux) nslookup output.
 function Get-ResolvedAddressesFromNsLookupOutput([string[]] $OutputLines) {
     #
     # Output on Windows:
@@ -166,6 +171,7 @@ function Get-ResolvedAddressesFromNsLookupOutput([string[]] $OutputLines) {
     $addresses | Select-Object -Unique
 }
 
+# Returns the container ID for the Unbound service in the test project.
 function Get-UnboundContainerId {
     $containerId = Invoke-DockerCompose ps --quiet unbound
 
@@ -176,6 +182,7 @@ function Get-UnboundContainerId {
     return $containerId
 }
 
+# Returns the health status for specified container, accounting for crashed containers.
 function Get-ContainerHealthStatus([string] $ContainerId) {
     # Obtain both the container's running and health status - separated by a space.
     $dockerInspectOutput = docker inspect --format '{{if .State.Running}}running{{else}}stopped{{end}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' $ContainerId
@@ -199,6 +206,7 @@ function Get-ContainerHealthStatus([string] $ContainerId) {
     return $containerHealthStatus
 }
 
+# Prints state and health check details for the specified container after a health timeout.
 function Write-UnboundHealthDiagnostics([string] $ContainerId) {
     Write-Host
     Write-Title "Unbound health diagnostics"
@@ -219,6 +227,7 @@ function Write-UnboundHealthDiagnostics([string] $ContainerId) {
     docker exec $ContainerId nslookup -type=SOA . 127.0.0.1
 }
 
+# Waits up to the specified number of seconds for the Unbound container to pass its default health check.
 function Assert-ContainerBecomesHealthy([int] $TimeoutSeconds) {
     $containerId = Get-UnboundContainerId
     $startedAt = [DateTimeOffset]::UtcNow
@@ -242,6 +251,7 @@ function Assert-ContainerBecomesHealthy([int] $TimeoutSeconds) {
     Write-Error "Unbound container did not become healthy within $TimeoutSeconds seconds. Last health status: $lastHealthStatus"
 }
 
+# Verifies that the Unbound process has a non-root effective user ID.
 function Assert-UnboundDoesNotRunAsRoot {
     $containerId = Get-UnboundContainerId
 
@@ -263,6 +273,7 @@ function Assert-UnboundDoesNotRunAsRoot {
     Write-Host "Verified Unbound does not run as root (effective user ID: $effectiveUserId)."
 }
 
+# Verifies that the Unbound service has not logged any warnings or errors.
 function Assert-UnboundLogsContainNoWarningsOrErrors {
     $logLines = @(Invoke-DockerCompose logs --no-color unbound)
     $problemLines = @($logLines | Where-Object { $_ -match '(?i)\b(?:warning|error):' })
@@ -275,12 +286,14 @@ function Assert-UnboundLogsContainNoWarningsOrErrors {
     Write-Host "Verified Unbound logs contain no warnings or errors."
 }
 
+# Verifies that nslookup is available on the host running the test.
 function Assert-NsLookupIsAvailable {
     if (-not (Get-Command nslookup -ErrorAction SilentlyContinue)) {
         Write-Error "The 'nslookup' command is required to run this test."
     }
 }
 
+# Verifies that the specified DNS result contains the specified IP address.
 function Assert-ResolvedAddress([System.Net.IPAddress[]] $Addresses, [string] $ExpectedAddress, [string] $Name) {
     $expected = [System.Net.IPAddress]::Parse($ExpectedAddress)
 
@@ -289,6 +302,7 @@ function Assert-ResolvedAddress([System.Net.IPAddress[]] $Addresses, [string] $E
     }
 }
 
+# Verifies that the specified DNS result contains at least one non-loopback address.
 function Assert-ResolvesToPublicAddress([System.Net.IPAddress[]] $Addresses, [string] $Name) {
     # Check if at least one address is not a loopback address.
     $publicAddresses = $Addresses | Where-Object { -not [System.Net.IPAddress]::IsLoopback($_) }
