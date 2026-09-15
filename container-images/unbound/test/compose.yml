@@ -19,3 +19,17 @@ services:
     # Workaround for Docker Compose bug: try to pull locally available non-native images from registry
     # See: https://github.com/docker/compose/issues/14007
     pull_policy: never
+
+  unbound-tls-forwarding:
+    image: ${UNBOUND_TEST_IMAGE:-homelab-unbound:local}
+    platform: ${UNBOUND_TEST_PLATFORM:-}
+    volumes:
+      - type: bind
+        source: ./unbound.tls-forwarding.test.conf
+        target: /etc/unbound/unbound.conf.d/test.conf
+        read_only: true
+    # This service deliberately refuses the root query used by the image's
+    # healthcheck. Readiness is established through unbound-control instead.
+    healthcheck:
+      disable: true
+    pull_policy: never

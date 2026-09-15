@@ -11,9 +11,12 @@ through the running Unbound service.
 It checks the following cases:
 
 - The Unbound process does not run as root.
+- The image's default healthcheck succeeds without a Compose override.
 - A custom local A record from the mounted test config resolves over UDP.
 - The same custom local A record resolves over TCP.
-- A real-world DNS name resolves through Unbound.
+- A public DNS record resolves through an authenticated DNS-over-TLS forwarder.
+- A different real-world DNS name resolves through Unbound's recursive resolver.
+- A name outside the permitted recursive and forwarded TLDs is refused.
 - The Unbound logs contain no warnings or errors.
 
 .EXAMPLE
@@ -39,6 +42,10 @@ $script:ErrorActionPreference = 'Stop'
 $PROJECT_NAME = "unbound-test-$([Guid]::NewGuid().ToString('N'))"
 $CUSTOM_NAME = 'healthcheck.homelab.test'
 $CUSTOM_ADDRESS = '1.2.3.4'
+$TLS_FORWARD_ZONE = 'net.'
+$TLS_FORWARD_ADDRESS = '1.1.1.1'
+$TLS_FORWARD_NAME = 'example.net'
+$REFUSED_NAME = 'example.org'
 
 # Writes the specified text as a visually distinct section title in the test output.
 function Write-Title([string] $Text) {
@@ -171,12 +178,34 @@ function Get-ResolvedAddressesFromNsLookupOutput([string[]] $OutputLines) {
     $addresses | Select-Object -Unique
 }
 
-# Returns the container ID for the Unbound service in the test project.
-function Get-UnboundContainerId {
-    $containerId = Invoke-DockerCompose ps --quiet unbound
+# DNS-resolves specified name through Unbound from inside the specified container.
+# NOTE: This is primarily for non-primary containers which intentionally don't have
+#   a port binding. As a side effect, this makes parsing the nslookup output easier
+#   to parse (because we're only looking at one operating system).
+function Invoke-ContainerDnsLookup([string] $ContainerId, [string] $Name) {
+    $outputLines = @(docker exec $ContainerId nslookup $Name 127.0.0.1 2>&1)
+    $exitCode = $LASTEXITCODE
+
+    if ($exitCode -ne 0) {
+        $text = ($outputLines | Out-String).Trim()
+        throw "nslookup for $Name inside container '$ContainerId' failed with exit code $exitCode.`n$text"
+    }
+
+    $addresses = Get-ResolvedAddressesFromNsLookupOutput $outputLines
+    if (-not $addresses) {
+        $text = ($outputLines | Out-String).Trim()
+        throw "nslookup for $Name inside container '$ContainerId' did not return any IP addresses.`n$text"
+    }
+
+    return @($addresses)
+}
+
+# Returns the container ID for the specified Unbound service.
+function Get-UnboundContainerId([string] $ServiceName = 'unbound') {
+    $containerId = Invoke-DockerCompose ps --quiet $ServiceName
 
     if (-not $containerId) {
-        Write-Error "Could not determine Unbound container ID."
+        Write-Error "Could not determine container ID for Unbound service '$ServiceName'."
     }
 
     return $containerId
@@ -251,7 +280,7 @@ function Assert-ContainerBecomesHealthy([int] $TimeoutSeconds) {
     Write-Error "Unbound container did not become healthy within $TimeoutSeconds seconds. Last health status: $lastHealthStatus"
 }
 
-# Verifies that the Unbound process has a non-root effective user ID.
+# Verifies that the primary Unbound process has a non-root effective user ID.
 function Assert-UnboundDoesNotRunAsRoot {
     $containerId = Get-UnboundContainerId
 
@@ -273,9 +302,30 @@ function Assert-UnboundDoesNotRunAsRoot {
     Write-Host "Verified Unbound does not run as root (effective user ID: $effectiveUserId)."
 }
 
-# Verifies that the Unbound service has not logged any warnings or errors.
-function Assert-UnboundLogsContainNoWarningsOrErrors {
-    $logLines = @(Invoke-DockerCompose logs --no-color unbound)
+# Verifies that the specified forward zone and address are active in Unbound.
+# NOTE: The runtime output does not include the forwarder's port or TLS configuration -
+#   so we can't test for that here.
+function Assert-ForwardZoneIsActive([string] $ContainerId, [string] $ZoneName, [string] $ExpectedAddress) {
+    $forwardZones = @(docker exec $ContainerId unbound-control list_forwards)
+    $exitCode = $LASTEXITCODE
+
+    if ($exitCode -ne 0) {
+        $text = ($forwardZones | Out-String).Trim()
+        Write-Error "Could not list Unbound's active forward zones (exit code $exitCode).`n$text"
+    }
+
+    $expectedForwardZone = "$ZoneName IN forward $ExpectedAddress"
+    if ($expectedForwardZone -notin $forwardZones) {
+        $text = ($forwardZones | Out-String).Trim()
+        Write-Error "Expected active forward zone '$expectedForwardZone'. Active forward zones:`n$text"
+    }
+
+    Write-Host "Verified active forward zone '$ZoneName' -> '$ExpectedAddress'."
+}
+
+# Verifies that the specified Unbound service has not logged any warnings or errors.
+function Assert-UnboundLogsContainNoWarningsOrErrors([string] $ServiceName) {
+    $logLines = @(Invoke-DockerCompose logs --no-color $ServiceName)
     $problemLines = @($logLines | Where-Object { $_ -match '(?i)\b(?:warning|error):' })
 
     if ($problemLines.Count -gt 0) {
@@ -283,13 +333,27 @@ function Assert-UnboundLogsContainNoWarningsOrErrors {
         Write-Error "Expected Unbound logs not to contain warnings or errors, but found $($problemLines.Count):`n$problemText"
     }
 
-    Write-Host "Verified Unbound logs contain no warnings or errors."
+    Write-Host "Verified '$ServiceName' logs contain no warnings or errors."
 }
 
 # Verifies that nslookup is available on the host running the test.
 function Assert-NsLookupIsAvailable {
     if (-not (Get-Command nslookup -ErrorAction SilentlyContinue)) {
         Write-Error "The 'nslookup' command is required to run this test."
+    }
+}
+
+# Verifies that the specified Unbound container explicitly refuses a DNS lookup.
+# NOTE: This is primarily for non-primary containers which intentionally don't have
+#   a port binding. As a side effect, this makes parsing the nslookup output easier
+#   to parse (because we're only looking at one operating system).
+function Assert-DnsLookupIsRefused([string] $ContainerId, [string] $Name) {
+    $outputLines = @(docker exec $ContainerId nslookup $Name 127.0.0.1 2>&1)
+    $exitCode = $LASTEXITCODE
+    $text = ($outputLines | Out-String).Trim()
+
+    if ($exitCode -eq 0 -or $text -notmatch '(?i)\bREFUSED\b') {
+        Write-Error "Expected DNS lookup for '$Name' to be refused (exit code $exitCode).`n$text"
     }
 }
 
@@ -355,11 +419,22 @@ try {
     Assert-ResolvedAddress -Addresses $customAddressesTcp -ExpectedAddress $CUSTOM_ADDRESS -Name $CUSTOM_NAME
     Write-Host "Verified TCP DNS lookup for custom record '$CUSTOM_NAME' -> '$CUSTOM_ADDRESS'."
 
+    $tlsForwardingContainerId = Get-UnboundContainerId -ServiceName 'unbound-tls-forwarding'
+    Assert-ForwardZoneIsActive -ContainerId $tlsForwardingContainerId -ZoneName $TLS_FORWARD_ZONE -ExpectedAddress $TLS_FORWARD_ADDRESS
+
+    $tlsForwardingAddresses = Invoke-ContainerDnsLookup -ContainerId $tlsForwardingContainerId -Name $TLS_FORWARD_NAME
+    Assert-ResolvesToPublicAddress -Addresses $tlsForwardingAddresses -Name $TLS_FORWARD_NAME
+    Write-Host "Verified DNS-over-TLS lookup for '$TLS_FORWARD_NAME' through the '$TLS_FORWARD_ZONE' forward zone."
+
     $realWorldAddresses = Invoke-DnsLookup -Name $RealWorldName
     Assert-ResolvesToPublicAddress -Addresses $realWorldAddresses -Name $RealWorldName
-    Write-Host "Verified real-world DNS lookup for '$RealWorldName' -> '$($realWorldAddresses[0])'."
+    Write-Host "Verified recursive DNS lookup for '$RealWorldName' -> '$($realWorldAddresses[0])'."
 
-    Assert-UnboundLogsContainNoWarningsOrErrors
+    Assert-DnsLookupIsRefused -ContainerId $tlsForwardingContainerId -Name $REFUSED_NAME
+    Write-Host "Verified DNS lookup outside the permitted TLDs is refused for '$REFUSED_NAME'."
+
+    Assert-UnboundLogsContainNoWarningsOrErrors -ServiceName 'unbound'
+    Assert-UnboundLogsContainNoWarningsOrErrors -ServiceName 'unbound-tls-forwarding'
 
     $failed = $false
 }
@@ -369,7 +444,7 @@ finally {
         Write-Title "Unbound container logs"
 
         try {
-            Invoke-DockerCompose logs --no-color unbound
+            Invoke-DockerCompose logs --no-color
         }
         catch {
             Write-Host $_
