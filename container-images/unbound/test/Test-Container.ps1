@@ -46,7 +46,8 @@ $CUSTOM_ADDRESS = '1.2.3.4'
 $TLS_FORWARD_ZONE = 'net.'
 $TLS_FORWARD_ADDRESS = '1.1.1.1'
 $TLS_FORWARD_NAME = 'example.net'
-$REFUSED_NAME = 'example.org'
+# This domain is outside the DoT service's permitted .net forward zone.
+$TLS_FORWARDING_REFUSED_NAME = 'example.org'
 # This public test domain deliberately contains broken DNSSEC data.
 $DNSSEC_BOGUS_NAME = 'dnssec-failed.org'
 
@@ -448,8 +449,8 @@ try {
     Assert-DnsLookupReturnsServerFailure -ContainerId $unboundContainerId -Name $DNSSEC_BOGUS_NAME
     Write-Host "Verified DNSSEC validation rejects '$DNSSEC_BOGUS_NAME' with SERVFAIL."
 
-    Assert-DnsLookupIsRefused -ContainerId $tlsForwardingContainerId -Name $REFUSED_NAME
-    Write-Host "Verified DNS lookup outside the permitted TLDs is refused for '$REFUSED_NAME'."
+    Assert-DnsLookupIsRefused -ContainerId $tlsForwardingContainerId -Name $TLS_FORWARDING_REFUSED_NAME
+    Write-Host "Verified DNS lookup outside the permitted TLDs is refused for '$TLS_FORWARDING_REFUSED_NAME'."
 
     Assert-UnboundLogsContainNoWarningsOrErrors -ServiceName 'unbound'
     Assert-UnboundLogsContainNoWarningsOrErrors -ServiceName 'unbound-tls-forwarding'
