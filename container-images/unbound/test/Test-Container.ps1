@@ -16,6 +16,7 @@ It checks the following cases:
 - The same custom local A record resolves over TCP.
 - A public DNS record resolves through an authenticated DNS-over-TLS forwarder.
 - A different real-world DNS name resolves through Unbound's recursive resolver.
+- A domain with deliberately broken DNSSEC data is rejected with SERVFAIL.
 - A name outside the permitted recursive and forwarded TLDs is refused.
 - The Unbound logs contain no warnings or errors.
 
@@ -46,6 +47,8 @@ $TLS_FORWARD_ZONE = 'net.'
 $TLS_FORWARD_ADDRESS = '1.1.1.1'
 $TLS_FORWARD_NAME = 'example.net'
 $REFUSED_NAME = 'example.org'
+# This public test domain deliberately contains broken DNSSEC data.
+$DNSSEC_BOGUS_NAME = 'dnssec-failed.org'
 
 # Writes the specified text as a visually distinct section title in the test output.
 function Write-Title([string] $Text) {
@@ -357,6 +360,17 @@ function Assert-DnsLookupIsRefused([string] $ContainerId, [string] $Name) {
     }
 }
 
+# Verifies that the specified Unbound container returns SERVFAIL for a DNS lookup.
+function Assert-DnsLookupReturnsServerFailure([string] $ContainerId, [string] $Name) {
+    $outputLines = @(docker exec $ContainerId nslookup $Name 127.0.0.1 2>&1)
+    $exitCode = $LASTEXITCODE
+    $text = ($outputLines | Out-String).Trim()
+
+    if ($exitCode -eq 0 -or $text -notmatch '(?i)\bSERVFAIL\b') {
+        Write-Error "Expected DNS lookup for '$Name' to fail with SERVFAIL (exit code $exitCode).`n$text"
+    }
+}
+
 # Verifies that the specified DNS result contains the specified IP address.
 function Assert-ResolvedAddress([System.Net.IPAddress[]] $Addresses, [string] $ExpectedAddress, [string] $Name) {
     $expected = [System.Net.IPAddress]::Parse($ExpectedAddress)
@@ -429,6 +443,10 @@ try {
     $realWorldAddresses = Invoke-DnsLookup -Name $RealWorldName
     Assert-ResolvesToPublicAddress -Addresses $realWorldAddresses -Name $RealWorldName
     Write-Host "Verified recursive DNS lookup for '$RealWorldName' -> '$($realWorldAddresses[0])'."
+
+    $unboundContainerId = Get-UnboundContainerId
+    Assert-DnsLookupReturnsServerFailure -ContainerId $unboundContainerId -Name $DNSSEC_BOGUS_NAME
+    Write-Host "Verified DNSSEC validation rejects '$DNSSEC_BOGUS_NAME' with SERVFAIL."
 
     Assert-DnsLookupIsRefused -ContainerId $tlsForwardingContainerId -Name $REFUSED_NAME
     Write-Host "Verified DNS lookup outside the permitted TLDs is refused for '$REFUSED_NAME'."
