@@ -6,7 +6,8 @@
 		"LASTEXITCODE",
 		"markdownlint",
 		"nslookup",
-		"Passwordless"
+		"Passwordless",
+		"xcaddy"
 	],
 
 	"markdownlint.config": {
