@@ -1,0 +1,46 @@
+name: Single container image (manual)
+run-name: "${{ inputs.publish && 'Publish' || 'Build' }} container image | ${{ inputs.image-name }}"
+
+# IMPORTANT: We need to keep this trigger out of "single-container-image.yml" because any changes
+#   to this workflow trigger a build of all containers. This includes just adding a new container
+#   to the image list below. So, to avoid a build of all containers whenever a PR introduces a new
+#   container image, we keep this image list out of "single-container-image.yml".
+on:
+  workflow_dispatch:
+    inputs:
+      image-name:
+        description: Container image to process.
+        type: choice
+        required: true
+        options:
+          - ansible-devcontainer
+          - unbound
+          - test-image
+      publish:
+        description: Publish the successfully validated container image.
+        type: boolean
+        required: false
+        default: false
+      use-daily-build-cache:
+        description: Use a daily-scoped GitHub Actions cache for Docker builds.
+        type: boolean
+        required: false
+        default: true
+      treat_as_scheduled_run:
+        description: "Treat as 'scheduled' run (for testing purposes)."
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-publish:
+    uses: ./.github/workflows/single-container-image.yml
+    with:
+      image-name: ${{ inputs.image-name }}
+      publish: ${{ inputs.publish }}
+      use-daily-build-cache: ${{ inputs.use-daily-build-cache }}
+      treat_as_scheduled_run: ${{ inputs.treat_as_scheduled_run }}
