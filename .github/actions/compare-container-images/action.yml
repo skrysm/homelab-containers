@@ -46,6 +46,8 @@ runs:
     - name: Compare container images
       id: container_image_comparison
       shell: gha-pwsh {0}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         & "$env:GITHUB_ACTION_PATH/Invoke-Action.ps1" `
             -BuildContext '${{ inputs.build-context }}' `

@@ -415,6 +415,8 @@ jobs:
       - name: Ensure container image version has not already been published
         if: steps.publish_decision.outputs.publish_image == 'true'
         shell: gha-pwsh {0}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $versionedImage = '${{ env.FINAL_IMAGE_NAME }}:${{ steps.version.outputs.version }}'
           $containerImageVersionExists = & './.github/scripts/Test-ContainerImageExists.ps1' -Image $versionedImage
