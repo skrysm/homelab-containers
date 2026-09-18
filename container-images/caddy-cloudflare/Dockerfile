@@ -19,7 +19,7 @@
 # Pin this stage to that platform so xcaddy runs without emulation while Go compiles Caddy
 # for the target image platform. (This reduces the build time on the default GHA runner
 # from 40 minutes to just 2 minutes.)
-FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder-alpine@sha256:56d2e0b832cdabf43f86f7ec1e241a49fa79a0232588923c6fe84920b9082e45 AS builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder-alpine@sha256:2b9f32cbba6045e79212bb253f595588d20be8f7d1edf61582c519e124e0d2d8 AS builder
 
 # BuildKit supplies these per target platform; declare them in this stage so RUN below can use them.
 # Target CPU architecture (amd64, arm64, or arm)
