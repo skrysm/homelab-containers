@@ -19,7 +19,7 @@
 # Pin this stage to that platform so xcaddy runs without emulation while Go compiles Caddy
 # for the target image platform. (This reduces the build time on the default GHA runner
 # from 40 minutes to just 2 minutes.)
-FROM --platform=$BUILDPLATFORM caddy:2.11.4-builder-alpine@sha256:0aa610043dab5da82ad0a0268e46bb852785e6f5160f12f1c6fe3f42903d7e1b AS builder
+FROM --platform=$BUILDPLATFORM caddy:2.11.6-builder-alpine@sha256:b0a9daab97b413316e23238e5d466849b0ebbba8d411f7344e084d9f51fe973a AS builder
 
 # BuildKit supplies these per target platform; declare them in this stage so RUN below can use them.
 # Target CPU architecture (amd64, arm64, or arm)
@@ -45,6 +45,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     # IMPORTANT: Keep this "--with ..." line's format in sync with the custom manager regex in renovate.jsonc.
     --with github.com/caddy-dns/cloudflare@v0.2.4
 
-FROM caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+FROM caddy:2.11.6-alpine@sha256:c776e0c6413b544d0459665e54ec7b8b2a15000c0cbee8b254da0067b1d184ff
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
