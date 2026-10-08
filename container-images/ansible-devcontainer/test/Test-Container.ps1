@@ -15,7 +15,7 @@ It checks these cases:
 3. zsh stores its history in the persistent state directory.
 4. Expected command line tools are available.
 5. Passwordless sudo works for the vscode user.
-6. Python can import Ansible- and Mitogen-related packages.
+6. Expected Python packages can be imported or queried.
 7. Ansible can execute a local ping module invocation.
 8. Ansible can load and execute Mitogen's strategy and action plugins.
 
@@ -151,12 +151,15 @@ function Assert-ToolsAreAvailable {
         'ansible-playbook',
         'ansible-vault',
         'ansible-lint',
+        'ruff',
+        'pyjson5',
         'python3',
         'git',
         'ssh',
         'sshpass',
         'sudo',
         'nano',
+        'htop',
         'ping',
         'dig',
         'nslookup',
@@ -200,18 +203,19 @@ function Assert-PythonPackagesAreAvailable {
     $pythonScript = @'
 import importlib.metadata
 
-for package_name in ("ansible", "ansible-lint", "mitogen", "passlib", "typer"):
+for package_name in ("ansible", "ansible-lint", "json5", "mitogen", "passlib", "ruff", "typer"):
     print(f"{package_name}=={importlib.metadata.version(package_name)}")
 
 import ansible
 import ansible_mitogen
+import json5
 import mitogen
 import passlib.hash
 import typer
 '@
 
     Invoke-ContainerCommand `
-        -Description "Ansible and Mitogen Python packages are available" `
+        -Description "expected Python packages are available" `
         -Command @('python3', '-c', $pythonScript)
 }
 

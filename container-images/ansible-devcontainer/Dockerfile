@@ -33,6 +33,10 @@ RUN pip3 install --no-cache-dir \
     ansible-lint \
     mitogen \
     passlib \
+    # JSON5 parser and command-line converter -> for AI agents
+    json5 \
+    # Python linter and formatter -> for AI agents
+    ruff \
     # allows to build custom commands
     typer \
     && ln -s \
@@ -54,6 +58,7 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-
     zsh \
     nano \
     most \
+    htop \
     wget \
     curl \
     unzip \
