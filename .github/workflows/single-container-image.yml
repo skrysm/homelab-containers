@@ -241,7 +241,7 @@ jobs:
           Write-Host "Published version: $publishedVersion"
 
           if ($candidateVersion -lt $publishedVersion) {
-              throw "Candidate software version '$candidateVersion' is older than the currently published version '$publishedVersion'."
+              Write-Error "Candidate software version '$candidateVersion' is older than the currently published version '$publishedVersion'."
           }
 
       - name: Determine container image version
