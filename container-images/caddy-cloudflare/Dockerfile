@@ -45,6 +45,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     # IMPORTANT: Keep this "--with ..." line's format in sync with the custom manager regex in renovate.jsonc.
     --with github.com/caddy-dns/cloudflare@v0.2.4
 
-FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+FROM caddy:2.11.7-alpine@sha256:24ec7b05bc532c7bb57f727030c5056e257ff7138b4b50460306819ff79362bd
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
