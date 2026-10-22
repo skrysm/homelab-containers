@@ -62,21 +62,21 @@
 	"packageRules": [
 		{
 			"matchManagers": ["github-actions"],
-			"groupName": "GitHub Actions",
+			"groupName": null, // Keep separate PRs per package to avoid a failure in one package from preventing updates to other packages.
 			"automerge": true,
 			"addLabels": ["github-actions"]
 		},
 		{
 			"matchDatasources": ["docker"],
 			"matchUpdateTypes": ["minor", "patch", "digest"],
-			"groupName": "Docker images",
+			"groupName": null, // Keep separate PRs per package to avoid a failure in one package from preventing updates to other packages.
 			"automerge": true,
 			"addLabels": ["docker"]
 		},
 		{
 			"matchDatasources": ["docker"],
 			"matchUpdateTypes": ["major"],
-			"groupName": "Docker images (major)",
+			"groupName": null, // Keep separate PRs per package to avoid a failure in one package from preventing updates to other packages.
 			"automerge": false,
 			"addLabels": ["docker", "major"]
 		}
