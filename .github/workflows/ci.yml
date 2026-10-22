@@ -1,5 +1,5 @@
 name: Continuous Integration
-run-name: "${{ github.event_name == 'schedule' && 'CI | Scheduled' || github.event_name == 'workflow_dispatch' && (inputs.publish && 'Publish all container images' || 'Build all container images (dry run)') || 'CI | Push' }}"
+run-name: "${{ github.event_name == 'workflow_dispatch' && (inputs.publish && 'Publish all container images' || 'Build all container images (dry run)') || 'CI | Push' }}"
 
 on:
   push:
@@ -13,10 +13,6 @@ on:
       - ".github/workflows/single-container-image.yml"
       - "container-images/**"
 
-  schedule:
-    # Every day at 00:23 UTC.
-    - cron: "23 0 * * *"
-
   workflow_dispatch:
     inputs:
       publish:
@@ -24,6 +20,19 @@ on:
         type: boolean
         required: false
         default: false
+      use-daily-build-cache:
+        description: Use a daily-scoped GitHub Actions cache for Docker builds.
+        type: boolean
+        required: false
+        default: true
+
+  # For calls from "ci-daily".
+  workflow_call:
+    inputs:
+      publish:
+        description: Publish successfully validated container images.
+        type: boolean
+        required: true
       use-daily-build-cache:
         description: Use a daily-scoped GitHub Actions cache for Docker builds.
         type: boolean
@@ -47,7 +56,7 @@ jobs:
       # For "push" runs, enable publishing only if container image files have changed. In particular, do not publish
       # if only .github files have changed. Some corner cases may still require publishing; in those cases, a
       # maintainer can manually trigger this workflow with publishing enabled.
-      publish_images: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish) || (github.event_name == 'push' && steps.selection.outputs.container_image_files_changed == 'true') }}
+      publish_images: ${{ inputs.publish || (github.event_name == 'push' && steps.selection.outputs.container_image_files_changed == 'true') }}
 
     steps:
       - name: Check out repository
@@ -78,5 +87,5 @@ jobs:
     with:
       image-name: ${{ matrix.image }}
       publish: ${{ needs.select-container-images.outputs.publish_images == 'true' }}
-      use-daily-build-cache: ${{ github.event_name != 'workflow_dispatch' || inputs.use-daily-build-cache }}
-      treat_as_scheduled_run: ${{ github.event_name == 'workflow_dispatch' && inputs.treat_as_scheduled_run }}
+      use-daily-build-cache: ${{ github.event_name == 'push' || inputs.use-daily-build-cache }}
+      treat_as_scheduled_run: ${{ inputs.treat_as_scheduled_run || false }}

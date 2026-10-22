@@ -1,0 +1,31 @@
+# NOTE: This workflow has been extracted from the "ci" workflow because the GitHub iOS app
+#   only shows the "name" in push notifications - not the "run-name". Having a separate
+#   workflow gives me a better workflow name in the push notifications.
+name: Daily container updates
+run-name: "${{ github.event_name == 'schedule' && 'Daily container updates' || inputs.publish && 'Daily container updates (manual)' || 'Daily container updates (dry run)' }}"
+
+on:
+  schedule:
+    # Every day at 00:23 UTC.
+    - cron: "23 0 * * *"
+
+  # Manually test scheduled behavior, with publishing disabled by default.
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish successfully validated container images.
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  update-container-images:
+    uses: ./.github/workflows/ci.yml
+    with:
+      publish: ${{ github.event_name == 'schedule' || inputs.publish }}
+      use-daily-build-cache: true
+      treat_as_scheduled_run: true
