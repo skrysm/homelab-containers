@@ -61,6 +61,7 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-
     htop \
     wget \
     curl \
+    ca-certificates \
     unzip \
     # required for Ansible to connect to hosts via SSH
     openssh-client \
@@ -78,6 +79,16 @@ RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-
     # Sandbox for AI agent commands
     bubblewrap \
     # Remove downloaded package list (they can always be re-retrieved via apt update)
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI from GitHub's official Debian repository.
+# See: https://github.com/cli/cli/blob/trunk/docs/install_linux.md#debian
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && chmod 0644 /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh \
     && rm -rf /var/lib/apt/lists/*
 
 # Add non-root "vscode" user required for devcontainers.
@@ -106,13 +117,15 @@ ENV EDITOR=nano
 # Create directories for persisting container state (across devcontainer rebuilds):
 #
 # * codex: for OpenAI Code VSCode plugin
+# * gh: for GitHub CLI configuration and authentication
 # * zsh: for retaining the zsh history
 #
 # The idea is that /persist is mounted as a named volume in the devcontainer.
-RUN mkdir -p /persist/codex /persist/zsh \
+RUN mkdir -p /persist/codex /persist/gh /persist/zsh \
     && chown -R vscode:vscode /persist \
     && chmod 0700 /persist
 ENV CODEX_HOME=/persist/codex
+ENV GH_CONFIG_DIR=/persist/gh
 
 # Add a bin folder for the workspace
 ENV PATH="/workspace/.devcontainer/bin:${PATH}"

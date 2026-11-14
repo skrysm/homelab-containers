@@ -11,7 +11,7 @@ the image works as a basic Ansible devcontainer.
 It checks these cases:
 
 1. The default user is the non-root vscode user.
-2. The persistent state directories are configured for Codex and zsh.
+2. The persistent state directories are configured for Codex, GitHub CLI, and zsh.
 3. zsh stores its history in the persistent state directory.
 4. Expected command line tools are available.
 5. Passwordless sudo works for the vscode user.
@@ -100,6 +100,7 @@ function Assert-DevcontainerFiles {
         )
 }
 
+# Verifies that persistent state directories are configured and writable by the default user.
 function Assert-PersistentState {
     Invoke-ContainerCommand `
         -Description "/persist has the expected permissions and owner" `
@@ -115,6 +116,14 @@ function Assert-PersistentState {
             'sh',
             '-lc',
             'test "$CODEX_HOME" = /persist/codex && test -d "$CODEX_HOME" && test -w "$CODEX_HOME"'
+        )
+
+    Invoke-ContainerCommand `
+        -Description "GitHub CLI uses its persistent directory" `
+        -Command @(
+            'sh',
+            '-lc',
+            'test "$GH_CONFIG_DIR" = /persist/gh && test -d "$GH_CONFIG_DIR" && test -w "$GH_CONFIG_DIR"'
         )
 
     Invoke-ContainerCommand `
@@ -155,6 +164,7 @@ function Assert-ToolsAreAvailable {
         'pyjson5',
         'python3',
         'git',
+        'gh',
         'ssh',
         'sshpass',
         'sudo',
