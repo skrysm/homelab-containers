@@ -5,7 +5,7 @@
 #
 
 # Ansible is written in Python - so we need a Python container.
-FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
+FROM python:3.15-slim@sha256:1c670c3568107e243bfd05457ad9ca0b11c35a855c985af73e4452db9a714e70
 
 # Use a UTF-8 locale that is available in Debian slim without installing the locales package.
 # Fixes Ansible locale errors.
